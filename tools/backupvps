@@ -1,0 +1,84 @@
+#!/bin/sh
+
+LOCKDIR=/var/lock/backupvps.lock
+
+LVORIGIN=/dev/vgvda2/lvroot
+LVSNAP=/dev/vgvda2/snaproot
+LVSIZE=2G
+
+MOUNTDIR=/opt/snaproot
+
+BACKUPCHOST=ddns.mitty.jp
+BACKUPPORT=2172
+BACKUPOOT=/opt/backup/backupvps/`hostname`
+
+TESTKEY=/root/backupvps/test.key
+SYNCKEY=/root/backupvps/sync.key
+SSHUSER=backupvps
+
+RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --timeout 600"
+RSYNCLIST=/root/backupvps/include.list
+
+if [ `date +%u` -eq 1 ]; then
+    RSYNCOPT="$RSYNCOPT --checksum"
+fi
+
+warn () {
+    [ -z "$1" ] && return 0
+    echo "$0: "
+    echo $1
+}
+
+cleanup () {
+    [ `mount | grep -c $MOUNTDIR` -ne 0 ] && umount $MOUNTDIR
+    [ -e $LVSNAP ] && lvremove --force $LVSNAP > /dev/null
+    rmdir $LOCKDIR
+}
+
+trap cleanup EXIT SIGHUP SIGINT SIGTERM
+
+
+# check connectivity of host
+ping -c 1 $BACKUPHOST > /dev/null
+if [ $? -ne 0 ]; then
+    warn "$BACKUPHOST seems to be down"
+    exit 1
+fi
+
+ssh -l $SSHUSER -i $TESTKEY -p $BACKUPPORT $BACKUPHOST
+if [ $? -ne 0 ]; then
+    warn "$BACKUPHOST seems to be down"
+    exit 1
+fi
+
+# create LVM snapshot
+lvcreate --snapshot --size $LVSIZE --name $LVSNAP $LVORIGIN > /dev/null
+if [ $? -ne 0 ]; then
+    warn "cannot create snapshot"
+    exit 1
+fi
+
+# mount snapshot
+mount -r $LVSNAP $MOUNTDIR
+if [ $? -ne 0 ]; then
+    warn "cannot mount snapshot"
+    exit 1
+fi
+
+# read directory list and merge them to one line
+DIRLIST=""
+while read line
+do
+    line=`echo $line | sed -e 's#/$##'`
+    DIRLIST="$DIRLIST $line"
+done < $RSYNCLIST
+
+# ready to rsync
+rsync --rsync-path="sudo rsync" $RSYNCOPT \
+    -e "ssh -tt -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT $BACKUPHOST" \
+    $DIRLIST $BACKUPHOST:$BACKUPROOT
+
+if [ $? -ne 0 ]; then
+    warn "something wrong on rsync"
+    exit 1
+fi
