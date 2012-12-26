@@ -8,9 +8,9 @@ LVSIZE=2G
 
 MOUNTDIR=/opt/snaproot
 
-BACKUPCHOST=ddns.mitty.jp
+BACKUPHOST=ddns.mitty.jp
 BACKUPPORT=2172
-BACKUPOOT=/opt/backup/backupvps/`hostname`
+BACKUPROOT=/opt/backup/backupvps/`hostname`
 
 TESTKEY=/root/backupvps/test.key
 SYNCKEY=/root/backupvps/sync.key
@@ -25,7 +25,7 @@ fi
 
 warn () {
     [ -z "$1" ] && return 0
-    echo "$0: "
+    echo -n "$0: "
     echo $1
 }
 
@@ -36,7 +36,7 @@ cleanup () {
 }
 
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
-
+mkdir -p $LOCKDIR
 
 # check connectivity of host
 ping -c 1 $BACKUPHOST > /dev/null
@@ -45,7 +45,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-ssh -l $SSHUSER -i $TESTKEY -p $BACKUPPORT $BACKUPHOST
+ssh -q -l $SSHUSER -i $TESTKEY -p $BACKUPPORT $BACKUPHOST
 if [ $? -ne 0 ]; then
     warn "$BACKUPHOST seems to be down"
     exit 1
@@ -67,7 +67,7 @@ fi
 
 # ready to rsync
 rsync --rsync-path="sudo rsync" $RSYNCOPT \
-    -e "ssh -tt -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT $BACKUPHOST" \
+    -e "ssh -tt -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
     --include-from=$RSYNCINCLUDE \
     / $BACKUPHOST:$BACKUPROOT
 
