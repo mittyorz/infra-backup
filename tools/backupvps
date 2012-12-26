@@ -35,8 +35,8 @@ cleanup () {
     rmdir $LOCKDIR
 }
 
+mkdir $LOCKDIR || exit 1
 trap cleanup EXIT HUP INT TERM
-mkdir -p $LOCKDIR
 
 # check connectivity of host
 ping -c 1 $BACKUPHOST > /dev/null
