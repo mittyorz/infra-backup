@@ -35,7 +35,7 @@ cleanup () {
     rmdir $LOCKDIR
 }
 
-trap cleanup EXIT SIGHUP SIGINT SIGTERM
+trap cleanup EXIT HUP INT TERM
 mkdir -p $LOCKDIR
 
 # check connectivity of host
@@ -67,7 +67,7 @@ fi
 
 # ready to rsync
 rsync --rsync-path="sudo rsync" $RSYNCOPT \
-    -e "ssh -tt -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
+    -e "ssh -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
     --include-from=$RSYNCINCLUDE \
     / $BACKUPHOST:$BACKUPROOT
 
