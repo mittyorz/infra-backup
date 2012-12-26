@@ -17,7 +17,7 @@ SYNCKEY=/root/backupvps/sync.key
 SSHUSER=backupvps
 
 RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --timeout 600"
-RSYNCINCLUDE=/root/backupvps/include.list
+RSYNCINCLUDE=/etc/backupvps.include.conf
 
 if [ `date +%u` -eq 1 ]; then
     RSYNCOPT="$RSYNCOPT --checksum"
