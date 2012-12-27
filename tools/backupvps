@@ -11,6 +11,7 @@ MOUNTDIR=/opt/snaproot
 BACKUPHOST=ddns.mitty.jp
 BACKUPPORT=2172
 BACKUPROOT=/opt/backup/backupvps/`hostname`
+BACKUPLOG=/opt/backup/backupvps/`hostname`.`date +%Y%m`.log
 
 TESTKEY=/root/backupvps/test.key
 SYNCKEY=/root/backupvps/sync.key
@@ -66,7 +67,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # ready to rsync
-rsync --rsync-path="sudo rsync" $RSYNCOPT \
+rsync --rsync-path="sudo rsync --log-file=$BACKUPLOG" $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
     --include-from=$RSYNCINCLUDE \
     / $BACKUPHOST:$BACKUPROOT
