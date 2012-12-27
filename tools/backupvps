@@ -17,7 +17,7 @@ TESTKEY=/root/backupvps/test.key
 SYNCKEY=/root/backupvps/sync.key
 SSHUSER=backupvps
 
-RSYNCOPT="-v -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 RSYNCLIST=/etc/backupvps.conf
 
 if [ `date +%u` -eq 1 ]; then
