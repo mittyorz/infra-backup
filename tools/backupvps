@@ -31,6 +31,7 @@ warn () {
 }
 
 cleanup () {
+    cd /
     [ `mount | grep -c $MOUNTDIR` -ne 0 ] && umount $MOUNTDIR
     [ -e $LVSNAP ] && lvremove --force $LVSNAP > /dev/null
     rmdir $LOCKDIR
@@ -68,15 +69,15 @@ fi
 
 # read directory list and merge them to one line
 DIRLIST=""
-ROOTDIR=`echo $MOUNTDIR | sed -e 's#/$##'`
 while read line
 do
     line=`echo $line | sed -e 's#/$##'`
     line=`echo $line | sed -e 's#^/##'`
-    DIRLIST="$DIRLIST $ROOTDIR/./$line"
+    DIRLIST="$DIRLIST $line"
 done < $RSYNCLIST
 
 # ready to rsync
+cd $MOUNTDIR
 rsync --rsync-path="sudo rsync --log-file=$BACKUPLOG" $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
     $DIRLIST $BACKUPHOST:$BACKUPROOT
