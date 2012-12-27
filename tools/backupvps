@@ -17,8 +17,8 @@ TESTKEY=/root/backupvps/test.key
 SYNCKEY=/root/backupvps/sync.key
 SSHUSER=backupvps
 
-RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --timeout 600"
-RSYNCINCLUDE=/etc/backupvps.include.conf
+RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+RSYNCLIST=/etc/backupvps.conf
 
 if [ `date +%u` -eq 1 ]; then
     RSYNCOPT="$RSYNCOPT --checksum"
@@ -66,11 +66,18 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# read directory list and merge them to one line
+DIRLIST=""
+while read line
+do
+    line=`echo $line | sed -e 's#/$##'`
+    DIRLIST="$DIRLIST $line"
+done < $RSYNCLIST
+
 # ready to rsync
 rsync --rsync-path="sudo rsync --log-file=$BACKUPLOG" $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
-    --include-from=$RSYNCINCLUDE \
-    / $BACKUPHOST:$BACKUPROOT
+    $DIRLIST $BACKUPHOST:$BACKUPROOT
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
