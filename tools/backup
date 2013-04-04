@@ -1,0 +1,90 @@
+#!/bin/sh
+
+LOCKDIR=/var/lock/backupvps.lock
+
+LVORIGIN=/dev/vgvda2/lvroot
+LVSNAP=/dev/vgvda2/snaproot
+LVSIZE=2G
+
+MOUNTDIR=/opt/snaproot
+
+BACKUPHOST=ddns.mitty.jp
+BACKUPPORT=2172
+BACKUPROOT=/opt/backup/backupvps/`hostname`
+BACKUPLOG=/opt/backup/backupvps/`hostname`.`date +%Y%m`.log
+
+TESTKEY=/root/backupvps/test.key
+SYNCKEY=/root/backupvps/sync.key
+SSHUSER=backupvps
+
+RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+RSYNCLIST=/etc/backupvps.conf
+
+# use md5 checksum for file modification check on every 1st day of months
+if [ `date +%u` -eq 1 ]; then
+    RSYNCOPT="$RSYNCOPT --checksum"
+fi
+
+warn () {
+    [ -z "$1" ] && return 0
+    echo -n "$0: "
+    echo $1
+}
+
+cleanup () {
+    cd /
+    [ `mount | grep -c $MOUNTDIR` -ne 0 ] && umount $MOUNTDIR
+    [ -e $LVSNAP ] && lvremove --force $LVSNAP > /dev/null
+    rmdir $LOCKDIR
+}
+
+mkdir $LOCKDIR || exit 1
+trap cleanup EXIT HUP INT TERM
+
+# check connectivity of host
+ping -c 1 $BACKUPHOST > /dev/null
+if [ $? -ne 0 ]; then
+    warn "$BACKUPHOST seems to be down (ping)"
+    exit 1
+fi
+
+ssh -q -l $SSHUSER -i $TESTKEY -p $BACKUPPORT $BACKUPHOST
+if [ $? -ne 0 ]; then
+    warn "$BACKUPHOST seems to be down (ssh)"
+    exit 1
+fi
+
+# create LVM snapshot
+lvcreate --snapshot --size $LVSIZE --name $LVSNAP $LVORIGIN > /dev/null
+if [ $? -ne 0 ]; then
+    warn "cannot create snapshot"
+    exit 1
+fi
+
+# mount snapshot
+mount -r $LVSNAP $MOUNTDIR
+if [ $? -ne 0 ]; then
+    warn "cannot mount snapshot"
+    exit 1
+fi
+
+# read directory list and merge them to one line
+# get rid of needless '/' from first and last of line
+DIRLIST=""
+while read line
+do
+    line=`echo $line | sed -e 's#/$##'`
+    line=`echo $line | sed -e 's#^/##'`
+    DIRLIST="$DIRLIST $line"
+done < $RSYNCLIST
+
+# ready to rsync
+cd $MOUNTDIR
+rsync --rsync-path="sudo rsync --log-file=$BACKUPLOG" $RSYNCOPT \
+    -e "ssh -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
+    $DIRLIST $BACKUPHOST:$BACKUPROOT
+
+if [ $? -ne 0 ]; then
+    warn "something wrong on rsync"
+    exit 1
+fi
