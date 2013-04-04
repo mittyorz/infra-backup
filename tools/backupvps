@@ -20,6 +20,7 @@ SSHUSER=backupvps
 RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 RSYNCLIST=/etc/backupvps.conf
 
+# use md5 checksum for file modification check on every 1st day of months
 if [ `date +%u` -eq 1 ]; then
     RSYNCOPT="$RSYNCOPT --checksum"
 fi
@@ -43,13 +44,13 @@ trap cleanup EXIT HUP INT TERM
 # check connectivity of host
 ping -c 1 $BACKUPHOST > /dev/null
 if [ $? -ne 0 ]; then
-    warn "$BACKUPHOST seems to be down"
+    warn "$BACKUPHOST seems to be down (ping)"
     exit 1
 fi
 
 ssh -q -l $SSHUSER -i $TESTKEY -p $BACKUPPORT $BACKUPHOST
 if [ $? -ne 0 ]; then
-    warn "$BACKUPHOST seems to be down"
+    warn "$BACKUPHOST seems to be down (ssh)"
     exit 1
 fi
 
@@ -68,6 +69,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # read directory list and merge them to one line
+# get rid of needless '/' from first and last of line
 DIRLIST=""
 while read line
 do
