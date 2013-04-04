@@ -1,28 +1,8 @@
 #!/bin/sh
 
-LOCKDIR=/var/lock/backupvps.lock
-
-LVORIGIN=/dev/vgvda2/lvroot
-LVSNAP=/dev/vgvda2/snaproot
-LVSIZE=2G
-
-MOUNTDIR=/opt/snaproot
-
-BACKUPHOST=ddns.mitty.jp
-BACKUPPORT=2172
-BACKUPROOT=/opt/backup/backupvps/`hostname`
-BACKUPLOG=/opt/backup/backupvps/`hostname`.`date +%Y%m`.log
-
-TESTKEY=/root/backupvps/test.key
-SYNCKEY=/root/backupvps/sync.key
-SSHUSER=backupvps
-
-RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
-RSYNCLIST=/etc/backupvps.conf
-
-# use md5 checksum for file modification check on every 1st day of months
-if [ `date +%u` -eq 1 ]; then
-    RSYNCOPT="$RSYNCOPT --checksum"
+if [ $# -eq 0 ]; then
+    echo "usage: $0 instance"
+    exit 1
 fi
 
 warn () {
@@ -31,15 +11,76 @@ warn () {
     echo $1
 }
 
+isexist () {
+    [ -e "$1" ] && return 0
+    warn "$1 does not exist"
+    exit 1
+}
+
+
+# global settings
+BACKUPROOT=/opt/backup
+
+
+# initialize
+INSTANCE="$1"
+CONFFILE="/etc/backup/${INSTANCE}.conf"
+CONFFILE="./${INSTANCE}.conf"
+isexist "$CONFFILE"
+
+
+# load configuration
+source $CONFFILE
+
+# check configuration
+checkvar () {
+    unset _checkvar
+    eval "_checkvar=\$$1"
+    if [ -z "$_checkvar" ]; then
+        warn "$1 is need to be set in '$CONFFILE'"
+        exit 1
+    fi
+}
+
+checkvar BACKUPHOST
+checkvar BACKUPPORT
+checkvar BACKUPLIST
+checkvar SSHUSER
+
+[ -z "$RSYNCOPT" ] && {
+    RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+    # use md5 checksum for file modification check on every 1st day of months
+    if [ `date +%u` -eq 1 ]; then
+        RSYNCOPT="$RSYNCOPT --checksum"
+    fi
+}
+
+BACKUPLOG=/var/log/backup/${INSTANCE}.`date +%Y%m`.log
+SSHKEY="/etc/backup/keys/${INSTANCE}"
+SSHKEY="./${INSTANCE}.conf"
+
+
+# check owner and permission of ssh key
+isexist "$SSHKEY"
+if [ `stat -c %u $SSHKEY` -ne 0 ]; then
+    warn "owner of sshkey is not root"
+    exit 1
+fi
+if [ `stat -c %a $SSHKEY` -ne 600 ]; then
+    warn "permission of sshkey is wrong"
+    exit 1
+fi
+
+
+# set lock
+LOCKDIR=/var/lock/backup.${INSTANCE}.lock
 cleanup () {
-    cd /
-    [ `mount | grep -c $MOUNTDIR` -ne 0 ] && umount $MOUNTDIR
-    [ -e $LVSNAP ] && lvremove --force $LVSNAP > /dev/null
     rmdir $LOCKDIR
 }
 
 mkdir $LOCKDIR || exit 1
 trap cleanup EXIT HUP INT TERM
+
 
 # check connectivity of host
 ping -c 1 $BACKUPHOST > /dev/null
@@ -48,41 +89,22 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-ssh -q -l $SSHUSER -i $TESTKEY -p $BACKUPPORT $BACKUPHOST
-if [ $? -ne 0 ]; then
-    warn "$BACKUPHOST seems to be down (ssh)"
-    exit 1
-fi
-
-# create LVM snapshot
-lvcreate --snapshot --size $LVSIZE --name $LVSNAP $LVORIGIN > /dev/null
-if [ $? -ne 0 ]; then
-    warn "cannot create snapshot"
-    exit 1
-fi
-
-# mount snapshot
-mount -r $LVSNAP $MOUNTDIR
-if [ $? -ne 0 ]; then
-    warn "cannot mount snapshot"
-    exit 1
-fi
 
 # read directory list and merge them to one line
 # get rid of needless '/' from first and last of line
 DIRLIST=""
-while read line
+for line in `echo $BACKUPLIST | tr '\n' ' '`
 do
     line=`echo $line | sed -e 's#/$##'`
     line=`echo $line | sed -e 's#^/##'`
-    DIRLIST="$DIRLIST $line"
-done < $RSYNCLIST
+    DIRLIST="$DIRLIST $BACKUPHOST:/$line"
+done
+
 
 # ready to rsync
-cd $MOUNTDIR
-rsync --rsync-path="sudo rsync --log-file=$BACKUPLOG" $RSYNCOPT \
-    -e "ssh -l $SSHUSER -i $SYNCKEY -p $BACKUPPORT" \
-    $DIRLIST $BACKUPHOST:$BACKUPROOT
+rsync --log-file=$BACKUPLOG --rsync-path="sudo rsync" $RSYNCOPT \
+    -e "ssh -l $SSHUSER -i $SSHKEY -p $BACKUPPORT" \
+    $DIRLIST $BACKUPROOT/$INSTANCE
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
