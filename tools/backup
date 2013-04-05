@@ -25,7 +25,6 @@ BACKUPROOT=/opt/backup
 # initialize
 INSTANCE="$1"
 CONFFILE="/etc/backup/${INSTANCE}.conf"
-CONFFILE="./${INSTANCE}.conf"
 isexist "$CONFFILE"
 
 
