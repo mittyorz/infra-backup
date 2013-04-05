@@ -56,7 +56,6 @@ checkvar SSHUSER
 
 BACKUPLOG=/var/log/backup/${INSTANCE}.`date +%Y%m`.log
 SSHKEY="/etc/backup/keys/${INSTANCE}"
-SSHKEY="./${INSTANCE}.conf"
 
 
 # check owner and permission of ssh key
