@@ -18,10 +18,6 @@ isexist () {
 }
 
 
-# global settings
-BACKUPROOT=/opt/backup
-
-
 # initialize
 INSTANCE="$1"
 CONFFILE="/etc/backup/${INSTANCE}.conf"
@@ -95,14 +91,14 @@ for line in `echo $BACKUPLIST | tr '\n' ' '`
 do
     line=`echo $line | sed -e 's#/$##'`
     line=`echo $line | sed -e 's#^/##'`
-    DIRLIST="$DIRLIST $BACKUPHOST:/$line"
+    DIRLIST="$DIRLIST /$line"
 done
 
 
 # ready to rsync
-rsync --log-file=$BACKUPLOG --rsync-path="sudo rsync" $RSYNCOPT \
+rsync --log-file=$BACKUPLOG $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SSHKEY -p $BACKUPPORT" \
-    $DIRLIST $BACKUPROOT/$INSTANCE
+    $DIRLIST $BACKUPHOST::$INSTANCE
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
