@@ -44,8 +44,8 @@ checkvar SSHUSER
 
 [ -z "$RSYNCOPT" ] && {
     RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
-    # use md5 checksum for file modification check on every 1st day of months
-    if [ `date +%u` -eq 1 ]; then
+    # use md5 checksum for file modification check on every day 03 a.m.
+    if [ `date +%H` -eq 03 ]; then
         RSYNCOPT="$RSYNCOPT --checksum"
     fi
 }
