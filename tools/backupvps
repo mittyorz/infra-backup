@@ -20,7 +20,7 @@ SSHUSER=backupvps
 RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 RSYNCLIST=/etc/backupvps.conf
 
-# use md5 checksum for file modification check on every 1st day of months
+# use md5 checksum for file modification check on every Monday
 if [ `date +%u` -eq 1 ]; then
     RSYNCOPT="$RSYNCOPT --checksum"
 fi
