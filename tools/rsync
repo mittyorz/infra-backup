@@ -12,7 +12,7 @@ warn () {
 }
 
 RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --timeout 600"
-RSYNCLOG=/var/log/backup/rsync.log
+RSYNCLOG=/var/log/rsync/rsync.log
 
 # set lock
 LOCKDIR=/var/lock/rsync.lock

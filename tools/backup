@@ -50,7 +50,7 @@ checkvar SSHUSER
     fi
 }
 
-BACKUPLOG=/var/log/backup/${INSTANCE}.log
+BACKUPLOG=/var/log/rsync/backup.${INSTANCE}.log
 SSHKEY="/etc/backup/keys/${INSTANCE}"
 
 
