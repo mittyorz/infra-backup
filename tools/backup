@@ -51,7 +51,9 @@ checkvar SSHUSER
 }
 
 BACKUPLOG=/var/log/rsync/backup.${INSTANCE}.log
-SSHKEY="/etc/backup/keys/${INSTANCE}"
+if [ -z "$SSHKEY" ]; then
+    SSHKEY="/etc/backup/keys/${INSTANCE}"
+fi
 
 
 # check owner and permission of ssh key
