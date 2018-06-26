@@ -23,6 +23,9 @@ INSTANCE="$1"
 CONFFILE="/etc/mirror/${INSTANCE}.conf"
 isexist "$CONFFILE"
 
+# set default vars
+LOGDIR='/var/log/rsync'
+LOCKDIR='/var/lock'
 
 # load configuration
 . $CONFFILE
@@ -43,13 +46,13 @@ checkvar MIRRORTARGET
 [ -z "$RSYNCOPT" ] && {
     RSYNCOPT="--quiet -rlpt --compress --hard-links --delete --delete-after --delay-updates --safe-links --timeout 600"
 }
-MIRRORLOG=/var/log/rsync/mirror.${INSTANCE}.log
+MIRRORLOG=$LOGDIR/mirror.${INSTANCE}.log
 
 isexist "$MIRRORTARGET"
 
 
 # set lock
-LOCKDIR=/var/lock/mirror.${INSTANCE}.lock
+LOCKDIR=$LOCKDIR/mirror.${INSTANCE}.lock
 cleanup () {
     rmdir $LOCKDIR
 }
