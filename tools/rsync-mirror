@@ -38,11 +38,10 @@ checkvar () {
 }
 
 checkvar MIRRORHOST
-checkvar MIRRORLIST
 checkvar MIRRORTARGET
 
 [ -z "$RSYNCOPT" ] && {
-    RSYNCOPT="--quiet -rlpt --compress --hard-links --delete --force --relative --timeout 600"
+    RSYNCOPT="--quiet -rlpt --compress --hard-links --delete --delete-after --delay-updates --safe-links --timeout 600"
 }
 MIRRORLOG=/var/log/rsync/mirror.${INSTANCE}.log
 
@@ -69,20 +68,9 @@ trap cleanup EXIT HUP INT TERM
 }
 
 
-# read directory list and merge them to one line
-# get rid of needless '/' from first and last of line
-DIRLIST=""
-for line in `echo $MIRRORLIST | tr '\n' ' '`
-do
-    line=`echo $line | sed -e 's#/$##'`
-    line=`echo $line | sed -e 's#^/##'`
-    DIRLIST="$DIRLIST $MIRRORHOST/$line"
-done
-
-
 # ready to rsync
 rsync --log-file=$MIRRORLOG $RSYNCOPT \
-    $DIRLIST $MIRRORTARGET
+    $MIRRORHOST $MIRRORTARGET
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
