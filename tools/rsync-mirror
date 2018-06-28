@@ -21,6 +21,9 @@ isexist () {
 # initialize
 INSTANCE="$1"
 CONFFILE="/etc/mirror/${INSTANCE}.conf"
+if [ -f "./${INSTANCE}.conf" ]; then
+    CONFFILE="./${INSTANCE}.conf"
+fi
 isexist "$CONFFILE"
 
 # set default vars
