@@ -44,7 +44,7 @@ checkvar MIRRORHOST
 checkvar MIRRORTARGET
 
 [ -z "$RSYNCOPT" ] && {
-    RSYNCOPT="--quiet -rlpt --hard-links --delete --delete-after --delay-updates --safe-links --timeout 600"
+    RSYNCOPT="--quiet -rlpt --hard-links --delete --delete-after --safe-links --timeout 600"
 }
 MIRRORLOG=$LOGDIR/mirror.${INSTANCE}.log
 
