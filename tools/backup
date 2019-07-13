@@ -1,14 +1,35 @@
 #!/bin/sh
 
+set -u
+
+usage () {
+    cat << EOF
+usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key] [-u username] [-d backup source]
+
+ -c: specify configuration file path
+
+ -h: specify hostname to send backup data
+
+ -p: port number of sshd
+     default is '22'
+
+ -k: specify ssh private key path
+
+ -u: username of ssh session
+    default is current username
+
+ -d: local directory path to be backuped
+
+EOF
+}
+
 if [ $# -eq 0 ]; then
-    echo "usage: $0 instance"
+    usage
     exit 1
 fi
 
 warn () {
-    [ -z "$1" ] && return 0
-    echo -n "$0: "
-    echo $1
+    >&2 echo "$0: $@"
 }
 
 isexist () {
