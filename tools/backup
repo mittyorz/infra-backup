@@ -51,7 +51,7 @@ isexist () {
 
 
 # parse commandline arguments
-BACKUPLIST=''
+__BACKUPLIST=''
 while getopts "c:h:p:k:u:d:" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
@@ -73,11 +73,16 @@ while getopts "c:h:p:k:u:d:" OPT; do
             ;;
         l)  BACKUPLOG="$OPTARG"
             ;;
-        d)  BACKUPLIST="$BACKUPLIST $OPTARG"
+        d)  __BACKUPLIST="$__BACKUPLIST $OPTARG"
             ;;
     esac
 done
 shift $(( $OPTIND - 1 ))
+
+# override with commandline arguments
+if [ -n "$__BACKUPLIST" ]; then
+    BACKUPLIST="$__BACKUPLIST"
+fi
 
 
 # check configuration and set default
@@ -149,6 +154,7 @@ cleanup () {
 mkdir $LOCKDIR || exit 1
 trap "exit 1" HUP INT QUIT PIPE TERM
 trap cleanup EXIT
+
 
 # ready to rsync
 rsync --log-file=$BACKUPLOG $RSYNCOPT \
