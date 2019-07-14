@@ -104,7 +104,7 @@ checkvar SSHKEY
 checkvar SSHUSER "$USER"
 checkvar RSYNCMODULE
 checkvar RSYNCOPT "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
-checkvar BACKUPLOG "/var/log/rsync/backup/${BACKUPHOST}_${RSYNCMODULE}.log"
+checkvar BACKUPLOG "/var/log/rsync/backup.${BACKUPHOST}_${RSYNCMODULE}.log"
 checkvar BACKUPLIST
 
 
@@ -143,11 +143,12 @@ done
 LOCKDIR=/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lock
 cleanup () {
     rmdir $LOCKDIR
+    exit 1
 }
 
 mkdir $LOCKDIR || exit 1
-trap cleanup EXIT HUP INT TERM
-
+trap "exit 1" HUP INT QUIT PIPE TERM
+trap cleanup EXIT
 
 # ready to rsync
 rsync --log-file=$BACKUPLOG $RSYNCOPT \
