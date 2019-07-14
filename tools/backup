@@ -5,7 +5,7 @@ set -u
 usage () {
     cat << EOF
 usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key]
-          [-u username] [-o rsync option] [-l logfile]
+          [-u username] [-m module name] [-o rsync option] [-l logfile]
           [-d backup source]
 
  -c: specify configuration file path
@@ -19,6 +19,8 @@ usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key]
 
  -u: username of ssh session
      default is current username
+
+ -m: specify module name for rsyncd
 
  -o: specify rsync option
      default is "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
@@ -47,6 +49,7 @@ isexist () {
     exit 1
 }
 
+
 # parse commandline arguments
 BACKUPLIST=''
 while getopts "c:h:p:k:u:d:" OPT; do
@@ -64,6 +67,8 @@ while getopts "c:h:p:k:u:d:" OPT; do
             ;;
         u)  SSHUSER="$OPTARG"
             ;;
+        m)  RSYNCMODULE="$OPTARG"
+            ;;
         o)  RSYNCOPT="$OPTARG"
             ;;
         l)  BACKUPLOG="$OPTARG"
@@ -73,6 +78,7 @@ while getopts "c:h:p:k:u:d:" OPT; do
     esac
 done
 shift $(( $OPTIND - 1 ))
+
 
 # check configuration and set default
 checkvar () {
@@ -90,14 +96,17 @@ checkvar () {
     fi
 }
 
+
 # check configrations and set default value if not yet
 checkvar BACKUPHOST
 checkvar BACKUPPORT "22"
 checkvar SSHKEY
 checkvar SSHUSER "$USER"
+checkvar RSYNCMODULE
 checkvar RSYNCOPT "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
-checkvar BACKUPLOG "/var/log/rsync/backup/${BACKUPHOST}.log"
+checkvar BACKUPLOG "/var/log/rsync/backup/${BACKUPHOST}_${RSYNCMODULE}.log"
 checkvar BACKUPLIST
+
 
 # check owner and permission of ssh key
 isexist "$SSHKEY"
@@ -109,16 +118,6 @@ if [ `stat -c %a $SSHKEY` -ne 600 ]; then
     warn "permission of sshkey is wrong"
     exit 1
 fi
-
-
-# set lock
-LOCKDIR=/var/lock/backup.${INSTANCE}.lock
-cleanup () {
-    rmdir $LOCKDIR
-}
-
-mkdir $LOCKDIR || exit 1
-trap cleanup EXIT HUP INT TERM
 
 
 # check connectivity of host
@@ -140,10 +139,20 @@ do
 done
 
 
+# set lock
+LOCKDIR=/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lock
+cleanup () {
+    rmdir $LOCKDIR
+}
+
+mkdir $LOCKDIR || exit 1
+trap cleanup EXIT HUP INT TERM
+
+
 # ready to rsync
 rsync --log-file=$BACKUPLOG $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SSHKEY -p $BACKUPPORT" \
-    $DIRLIST $BACKUPHOST::$INSTANCE
+    $DIRLIST $BACKUPHOST::$RSYNCMODULE
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
