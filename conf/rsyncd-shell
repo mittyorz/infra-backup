@@ -2,4 +2,4 @@
 
 set -ue
 
-exec -c /usr/bin/sudo /usr/bin/rsync --server --daemon --config=/etc/rsyncd/rsyncd.conf .
+exec -c /usr/bin/sudo /usr/bin/rsync --server --daemon --config=/etc/rsyncd/rsyncd.conf /srv/rsyncd
