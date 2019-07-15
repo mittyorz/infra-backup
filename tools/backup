@@ -53,7 +53,7 @@ isexist () {
 
 # parse commandline arguments
 __BACKUPLIST=''
-while getopts "c:h:p:k:u:d:" OPT; do
+while getopts "c:h:p:k:u:m:o:l:d:" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
             isexist "$CONFFILE"
@@ -89,9 +89,9 @@ fi
 # check configuration and set default
 checkvar () {
     unset _checkvar
-    set +o nounset
+    set +u
     eval "_checkvar=\$$1"
-    set -o nounset
+    set -u
     if [ -z "$_checkvar" ]; then
         if [ $# -eq 2 ]; then
             eval "$1=\"$2\""
