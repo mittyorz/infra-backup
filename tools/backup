@@ -1,14 +1,47 @@
 #!/bin/sh
 
+set -u
+set -e
+
+usage () {
+    cat << EOF
+usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key]
+          [-u username] [-m module name] [-o rsync option] [-l logfile]
+          [-d backup source]
+
+ -c: specify configuration file path
+
+ -h: specify hostname to send backup data
+
+ -p: port number of sshd
+     default is '22'
+
+ -k: specify ssh private key path
+
+ -u: username of ssh session
+     default is current username
+
+ -m: specify module name for rsyncd
+
+ -o: specify rsync option
+     default is "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+
+ -l: specify log file path
+     default is '/var/log/backup/`backup-hostname`.log'
+
+ -d: local directory path to be backuped
+     (multiple -d is acceptable)
+
+EOF
+}
+
 if [ $# -eq 0 ]; then
-    echo "usage: $0 instance"
+    usage
     exit 1
 fi
 
 warn () {
-    [ -z "$1" ] && return 0
-    echo -n "$0: "
-    echo $1
+    >&2 echo "$0: $@"
 }
 
 isexist () {
@@ -18,42 +51,67 @@ isexist () {
 }
 
 
-# initialize
-INSTANCE="$1"
-CONFFILE="/etc/backup/${INSTANCE}.conf"
-isexist "$CONFFILE"
+# parse commandline arguments
+__BACKUPLIST=''
+while getopts "c:h:p:k:u:m:o:l:d:" OPT; do
+    case $OPT in
+        c)  CONFFILE="$OPTARG"
+            isexist "$CONFFILE"
+            # load configuration
+            . $CONFFILE
+            ;;
+        h)  BACKUPHOST="$OPTARG"
+            ;;
+        p)  BACKUPPORT="$OPTARG"
+            ;;
+        k)  SSHKEY="$OPTARG"
+            ;;
+        u)  SSHUSER="$OPTARG"
+            ;;
+        m)  RSYNCMODULE="$OPTARG"
+            ;;
+        o)  RSYNCOPT="$OPTARG"
+            ;;
+        l)  BACKUPLOG="$OPTARG"
+            ;;
+        d)  __BACKUPLIST="$__BACKUPLIST $OPTARG"
+            ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
+
+# override with commandline arguments
+if [ -n "$__BACKUPLIST" ]; then
+    BACKUPLIST="$__BACKUPLIST"
+fi
 
 
-# load configuration
-. $CONFFILE
-
-# check configuration
+# check configuration and set default
 checkvar () {
     unset _checkvar
+    set +u
     eval "_checkvar=\$$1"
+    set -u
     if [ -z "$_checkvar" ]; then
-        warn "$1 is need to be set in '$CONFFILE'"
-        exit 1
+        if [ $# -eq 2 ]; then
+            eval "$1=\"$2\""
+        else
+            warn "$1 is need to be set"
+            exit 1
+        fi
     fi
 }
 
+
+# check configrations and set default value if not yet
 checkvar BACKUPHOST
-checkvar BACKUPPORT
+checkvar BACKUPPORT "22"
+checkvar SSHKEY
+checkvar SSHUSER "$USER"
+checkvar RSYNCMODULE
+checkvar RSYNCOPT "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+checkvar BACKUPLOG "/var/log/rsync/backup.${BACKUPHOST}_${RSYNCMODULE}.log"
 checkvar BACKUPLIST
-checkvar SSHUSER
-
-[ -z "$RSYNCOPT" ] && {
-    RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
-    # use md5 checksum for file modification check on every day 03 a.m.
-    if [ `date +%H` -eq 03 ]; then
-        RSYNCOPT="$RSYNCOPT --checksum"
-    fi
-}
-
-BACKUPLOG=/var/log/rsync/backup.${INSTANCE}.log
-if [ -z "$SSHKEY" ]; then
-    SSHKEY="/etc/backup/keys/${INSTANCE}"
-fi
 
 
 # check owner and permission of ssh key
@@ -66,16 +124,6 @@ if [ `stat -c %a $SSHKEY` -ne 600 ]; then
     warn "permission of sshkey is wrong"
     exit 1
 fi
-
-
-# set lock
-LOCKDIR=/var/lock/backup.${INSTANCE}.lock
-cleanup () {
-    rmdir $LOCKDIR
-}
-
-mkdir $LOCKDIR || exit 1
-trap cleanup EXIT HUP INT TERM
 
 
 # check connectivity of host
@@ -97,10 +145,22 @@ do
 done
 
 
+# set lock
+LOCKDIR=/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lock
+cleanup () {
+    rmdir $LOCKDIR
+    exit 1
+}
+
+mkdir $LOCKDIR || exit 1
+trap "exit 1" HUP INT QUIT PIPE TERM
+trap cleanup EXIT
+
+
 # ready to rsync
 rsync --log-file=$BACKUPLOG $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SSHKEY -p $BACKUPPORT" \
-    $DIRLIST $BACKUPHOST::$INSTANCE
+    $DIRLIST $BACKUPHOST::$RSYNCMODULE
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
