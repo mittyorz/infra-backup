@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -u
-set -e
 
 usage () {
     cat << EOF
@@ -29,6 +28,9 @@ usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key]
  -l: specify log file path
      default is '/var/log/backup/`backup-hostname`.log'
 
+ -L: specify lock directory path
+     default is '/var/lock/backup.`backup-hostname`_`port number`_`module name`.lock'
+
  -d: local directory path to be backuped
      (multiple -d is acceptable)
 
@@ -53,7 +55,7 @@ isexist () {
 
 # parse commandline arguments
 __BACKUPLIST=''
-while getopts "c:h:p:k:u:m:o:l:d:" OPT; do
+while getopts "c:h:p:k:u:m:o:l:L:d:" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
             isexist "$CONFFILE"
@@ -73,6 +75,8 @@ while getopts "c:h:p:k:u:m:o:l:d:" OPT; do
         o)  RSYNCOPT="$OPTARG"
             ;;
         l)  BACKUPLOG="$OPTARG"
+            ;;
+        L)  LOCKDIR="$OPTARG"
             ;;
         d)  __BACKUPLIST="$__BACKUPLIST $OPTARG"
             ;;
@@ -112,6 +116,7 @@ checkvar RSYNCMODULE
 checkvar RSYNCOPT "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 checkvar BACKUPLOG "/var/log/rsync/backup.${BACKUPHOST}_${RSYNCMODULE}.log"
 checkvar BACKUPLIST
+checkvar LOCKDIR "/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lock"
 
 
 # check owner and permission of ssh key
@@ -146,7 +151,6 @@ done
 
 
 # set lock
-LOCKDIR=/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lock
 cleanup () {
     rmdir $LOCKDIR
     exit 1
