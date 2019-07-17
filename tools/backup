@@ -121,8 +121,8 @@ checkvar LOCKDIR "/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lo
 
 # check owner and permission of ssh key
 isexist "$SSHKEY"
-if [ `stat -c %u $SSHKEY` -ne 0 ]; then
-    warn "owner of sshkey is not root"
+if [ `stat -c %u $SSHKEY` -ne `id -u` ]; then
+    warn "owner of sshkey is not $USER"
     exit 1
 fi
 if [ `stat -c %a $SSHKEY` -ne 600 ]; then
