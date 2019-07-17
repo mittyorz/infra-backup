@@ -144,6 +144,10 @@ fi
 DIRLIST=""
 for line in `echo $BACKUPLIST | tr '\n' ' '`
 do
+    if [ ! -e "$line" ]; then
+        warn "$line does not exist, removed from backup list"
+        continue
+    fi
     line=`echo $line | sed -e 's#/$##'`
     line=`echo $line | sed -e 's#^/##'`
     DIRLIST="$DIRLIST /$line"
