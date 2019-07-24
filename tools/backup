@@ -111,7 +111,7 @@ checkvar () {
 checkvar BACKUPHOST
 checkvar BACKUPPORT "22"
 checkvar SSHKEY
-checkvar SSHUSER "$USER"
+checkvar SSHUSER
 checkvar RSYNCMODULE
 checkvar RSYNCOPT "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 checkvar BACKUPLOG "/var/log/rsync/backup.${BACKUPHOST}_${RSYNCMODULE}.log"
