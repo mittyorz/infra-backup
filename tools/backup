@@ -157,11 +157,11 @@ done
 # set lock
 cleanup () {
     rmdir $LOCKDIR
-    exit 1
+    exit
 }
 
 mkdir $LOCKDIR || exit 1
-trap "exit 1" HUP INT QUIT PIPE TERM
+trap exit HUP INT QUIT PIPE TERM
 trap cleanup EXIT
 
 
