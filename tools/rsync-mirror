@@ -12,6 +12,7 @@ usage: $0 [-c config file] [-h source host] [-p source path] [-u url to last upd
  -h: specify hostname serves original data
 
  -p: specify module and path name of source host
+     path should be end with trailing slach '/'
 
  -u: url that returns last update date
 
