@@ -45,65 +45,87 @@ isexist () {
 }
 
 
-# initialize
-INSTANCE="$1"
-CONFFILE="/etc/mirror/${INSTANCE}.conf"
-if [ -f "./${INSTANCE}.conf" ]; then
-    CONFFILE="./${INSTANCE}.conf"
-fi
-isexist "$CONFFILE"
+# parse commandline arguments
+while getopts "c:h:p:u:d:o:l:L:" OPT; do
+    case $OPT in
+        c)  CONFFILE="$OPTARG"
+            isexist "$CONFFILE"
+            # load configuration
+            . $CONFFILE
+            ;;
+        h)  SRCHOST="$OPTARG"
+            ;;
+        p)  SRCPATH="$OPTARG"
+            ;;
+        u)  LASTUPDATE="$OPTARG"
+            ;;
+        d)  DSTPATH="$OPTARG"
+            ;;
+        o)  RSYNCOPT="$OPTARG"
+            ;;
+        l)  RSYNCLOG="$OPTARG"
+            ;;
+        L)  LOCKDIR="$OPTARG"
+            ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
 
-# set default vars
-LOGDIR='/var/log/rsync'
-LOCKDIR='/var/lock'
 
-# load configuration
-. $CONFFILE
-
-# check configuration
+# check configuration and set default
 checkvar () {
     unset _checkvar
+    set +u
     eval "_checkvar=\$$1"
+    set -u
     if [ -z "$_checkvar" ]; then
-        warn "$1 is need to be set in '$CONFFILE'"
-        exit 1
+        if [ $# -eq 2 ]; then
+            eval "$1=\"$2\""
+        else
+            warn "$1 is need to be set"
+            exit 1
+        fi
     fi
 }
 
-checkvar MIRRORHOST
-checkvar MIRRORTARGET
 
-[ -z "$RSYNCOPT" ] && {
-    RSYNCOPT="--quiet -rlpt --hard-links --delete --delete-after --safe-links --timeout 600"
-}
-MIRRORLOG=$LOGDIR/mirror.${INSTANCE}.log
+# check configrations and set default value if not yet
+checkvar LASTUPDATE ""
+checkvar SRCHOST
+checkvar SRCPATH
+checkvar DSTPATH
+checkvar RSYNCOPT "--quiet -rlpt --hard-links --delete --delete-after --safe-links --timeout 600"
 
-isexist "$MIRRORTARGET"
+__SRCPATH=$(echo $SRCPATH | tr '/' '_')
 
+checkvar RSYNCLOG "/var/log/rsync/mirror.${SRCHOST}_${__SRCPATH}.log"
+checkvar LOCKDIR "/var/lock/mirror.${SRCHOST}_${__SRCPATH}.lock"
 
-# set lock
-LOCKDIR=$LOCKDIR/mirror.${INSTANCE}.lock
-cleanup () {
-    rmdir $LOCKDIR
-}
-
-mkdir $LOCKDIR || exit 1
-trap cleanup EXIT HUP INT TERM
+isexist "$DSTPATH"
 
 
 # check connectivity of host
-[ ! -z "$PINGHOST" ] && {
-    ping -c 1 $PINGHOST > /dev/null
-    if [ $? -ne 0 ]; then
-        warn "$PINGHOST seems to be down (ping)"
-        exit 1
-    fi
+ping -c 1 $SRCHOST > /dev/null
+if [ $? -ne 0 ]; then
+    warn "$SRCHOST seems to be down (ping)"
+    exit 1
+fi
+
+
+# set lock
+cleanup () {
+    rmdir $LOCKDIR
+    exit
 }
+
+mkdir $LOCKDIR || exit 1
+trap exit HUP INT QUIT PIPE TERM
+trap cleanup EXIT
 
 
 # ready to rsync
-rsync --log-file=$MIRRORLOG $RSYNCOPT \
-    $MIRRORHOST $MIRRORTARGET
+rsync --log-file=$RSYNCLOG $RSYNCOPT \
+    $SRCHOST::$SRCPATH $DSTPATH
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
