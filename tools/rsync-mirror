@@ -21,8 +21,14 @@ isexist () {
 # initialize
 INSTANCE="$1"
 CONFFILE="/etc/mirror/${INSTANCE}.conf"
+if [ -f "./${INSTANCE}.conf" ]; then
+    CONFFILE="./${INSTANCE}.conf"
+fi
 isexist "$CONFFILE"
 
+# set default vars
+LOGDIR='/var/log/rsync'
+LOCKDIR='/var/lock'
 
 # load configuration
 . $CONFFILE
@@ -38,19 +44,18 @@ checkvar () {
 }
 
 checkvar MIRRORHOST
-checkvar MIRRORLIST
 checkvar MIRRORTARGET
 
 [ -z "$RSYNCOPT" ] && {
-    RSYNCOPT="--quiet -rlpt --compress --hard-links --delete --force --relative --timeout 600"
+    RSYNCOPT="--quiet -rlpt --hard-links --delete --delete-after --safe-links --timeout 600"
 }
-MIRRORLOG=/var/log/rsync/mirror.${INSTANCE}.log
+MIRRORLOG=$LOGDIR/mirror.${INSTANCE}.log
 
 isexist "$MIRRORTARGET"
 
 
 # set lock
-LOCKDIR=/var/lock/mirror.${INSTANCE}.lock
+LOCKDIR=$LOCKDIR/mirror.${INSTANCE}.lock
 cleanup () {
     rmdir $LOCKDIR
 }
@@ -69,20 +74,9 @@ trap cleanup EXIT HUP INT TERM
 }
 
 
-# read directory list and merge them to one line
-# get rid of needless '/' from first and last of line
-DIRLIST=""
-for line in `echo $MIRRORLIST | tr '\n' ' '`
-do
-    line=`echo $line | sed -e 's#/$##'`
-    line=`echo $line | sed -e 's#^/##'`
-    DIRLIST="$DIRLIST $MIRRORHOST/$line"
-done
-
-
 # ready to rsync
 rsync --log-file=$MIRRORLOG $RSYNCOPT \
-    $DIRLIST $MIRRORTARGET
+    $MIRRORHOST $MIRRORTARGET
 
 if [ $? -ne 0 ]; then
     warn "something wrong on rsync"
