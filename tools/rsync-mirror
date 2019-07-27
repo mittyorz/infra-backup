@@ -1,14 +1,41 @@
 #!/bin/sh
 
+set -u
+
+usage () {
+    cat <<'EOF'
+usage: $0 [-c config file] [-h source host] [-p source path] [-u url to last update info]
+          [-d dest dir path] [-o rsync option] [-l logfile] [-L lock dir]
+
+ -c: specify configuration file path
+
+ -h: specify hostname serves original data
+
+ -p: specify module and path name of source host
+
+ -u: url that returns last update date
+
+ -d: local directory path to store data
+
+ -o: specify rsync option
+     default is "--quiet -rlpt --hard-links --delete --delete-after --safe-links --timeout 600"
+
+ -l: specify log file path
+     default is '/var/log/rsync/mirror.`hostname`_`path`.log'
+
+ -L: specify lock directory path
+     default is '/var/lock/mirror.`hostname`_`path`.lock'
+
+EOF
+}
+
 if [ $# -eq 0 ]; then
-    echo "usage: $0 instance"
+    usage
     exit 1
 fi
 
 warn () {
-    [ -z "$1" ] && return 0
-    echo -n "$0: "
-    echo $1
+    >&2 echo "$0: $@"
 }
 
 isexist () {

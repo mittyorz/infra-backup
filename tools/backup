@@ -3,7 +3,7 @@
 set -u
 
 usage () {
-    cat << EOF
+    cat <<'EOF'
 usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key]
           [-u username] [-m module name] [-o rsync option] [-l logfile]
           [-d backup source]
