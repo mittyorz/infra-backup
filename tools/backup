@@ -132,8 +132,17 @@ fi
 
 
 # check connectivity of host
-ping -c 1 $BACKUPHOST > /dev/null
-if [ $? -ne 0 ]; then
+for retry in 1 2 3; do
+    ping -c 1 $BACKUPHOST
+    ret=$?
+    if [ $ret -eq 0 ]; then
+        break
+    else
+        sleep 1s
+        continue
+    fi
+done
+if [ $ret -ne 0 ]; then
     warn "$BACKUPHOST seems to be down (ping)"
     exit 1
 fi
