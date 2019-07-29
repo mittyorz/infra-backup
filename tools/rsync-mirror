@@ -16,6 +16,8 @@ usage: $0 [-c config file] [-h source host] [-p source path] [-u url to last upd
 
  -u: url that returns last update date
 
+ -U: local file path to store last update date
+
  -d: local directory path to store data
 
  -o: specify rsync option
@@ -58,7 +60,9 @@ while getopts "c:h:p:u:d:o:l:L:" OPT; do
             ;;
         p)  SRCPATH="$OPTARG"
             ;;
-        u)  LASTUPDATE="$OPTARG"
+        u)  LASTUPDATEURL="$OPTARG"
+            ;;
+        U)  LASTUPDATEFILE="$OPTARG"
             ;;
         d)  DSTPATH="$OPTARG"
             ;;
@@ -91,7 +95,8 @@ checkvar () {
 
 
 # check configrations and set default value if not yet
-checkvar LASTUPDATE ""
+checkvar LASTUPDATEURL ""
+checkvar LASTUPDATEFILE ""
 checkvar SRCHOST
 checkvar SRCPATH
 checkvar DSTPATH
@@ -110,6 +115,23 @@ ping -c 1 $SRCHOST > /dev/null
 if [ $? -ne 0 ]; then
     warn "$SRCHOST seems to be down (ping)"
     exit 1
+fi
+
+
+# check is there any update?
+if [ -f "$LASTUPDATEFILE" -a -n "$LASTUPDATEURL" ]; then
+    serversynctime=$(curl --silent -f $LASTUPDATEURL)
+    localsynctime=$(cat $LASTUPDATEFILE)
+    if [ -z "$serversynctime" ]; then
+        warn "something wrong on retrieving server sync time"
+        exit 1
+    fi
+    if [ -n "$localsynctime" ]; then
+        if [ "$serversynctime" -le "$localsynctime" ]; then
+            warn "no update on server"
+            exit 0
+        fi
+    fi
 fi
 
 
