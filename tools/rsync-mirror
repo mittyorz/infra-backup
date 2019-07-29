@@ -49,7 +49,7 @@ isexist () {
 
 
 # parse commandline arguments
-while getopts "c:h:p:u:d:o:l:L:" OPT; do
+while getopts "c:h:p:u:U:d:o:l:L:" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
             isexist "$CONFFILE"
@@ -128,7 +128,7 @@ if [ -f "$LASTUPDATEFILE" -a -n "$LASTUPDATEURL" ]; then
     fi
     if [ -n "$localsynctime" ]; then
         if [ "$serversynctime" -le "$localsynctime" ]; then
-            warn "no update on server"
+            warn "$SRCHOST::$SRCPATH has no update"
             exit 0
         fi
     fi
