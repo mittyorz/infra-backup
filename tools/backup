@@ -133,7 +133,7 @@ fi
 
 # check connectivity of host
 for retry in 1 2 3; do
-    ping -c 1 $BACKUPHOST
+    ping -c 1 $BACKUPHOST > /dev/null 2>&1
     ret=$?
     if [ $ret -eq 0 ]; then
         break

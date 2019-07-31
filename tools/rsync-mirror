@@ -112,7 +112,7 @@ isexist "$DSTPATH"
 
 # check connectivity of host
 for retry in 1 2 3; do
-    ping -c 1 $BACKUPHOST
+    ping -c 1 $SRCHOST > /dev/null 2>&1
     ret=$?
     if [ $ret -eq 0 ]; then
         break
@@ -122,7 +122,7 @@ for retry in 1 2 3; do
     fi
 done
 if [ $ret -ne 0 ]; then
-    warn "$BACKUPHOST seems to be down (ping)"
+    warn "$SRCHOST seems to be down (ping)"
     exit 1
 fi
 
