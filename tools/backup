@@ -133,12 +133,12 @@ fi
 
 # check connectivity of host
 for retry in 1 2 3; do
-    ping -c 1 $BACKUPHOST > /dev/null 2>&1
+    ping -W 1 -c 1 $BACKUPHOST > /dev/null 2>&1
     ret=$?
     if [ $ret -eq 0 ]; then
         break
     else
-        sleep 1s
+        sleep 10s
         continue
     fi
 done
