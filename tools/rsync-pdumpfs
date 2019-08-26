@@ -113,15 +113,15 @@ done
 
 
 # generate directory path for 'today' and latest backup directories
-LATEST="$DSTDIR/latest"
-LASTESTDIR=""       # absolute path of latest backup
+LATEST=$(echo "$DSTPATH/latest" | sed -e 's#//#/#')
+LATESTDIR=""       # absolute path of latest backup
 if [ -e "$LATEST" ]; then
     if [ ! -L "$LATEST" ]; then
         warn "$LATEST is not symblic link"
         exit 1
     fi
 
-    LASTESTDIR=$(readlink -e "$LATEST")
+    LATESTDIR=$(readlink -e "$LATEST")
     if [ -z "$LATESTDIR" ]; then
         warn "$LATEST -> $LATESTDIR does not exist"
         exit 1
@@ -129,7 +129,7 @@ if [ -e "$LATEST" ]; then
 fi
 
 TODAY=$(date +'%Y/%m/%d')
-TODAYDIR="$DSTDIR/$TODAY"
+TODAYDIR=$(readlink -m "$DSTPATH/$TODAY")
 
 
 # check latest and today backup directories and modify rsync option
@@ -146,9 +146,16 @@ if [ -n "$LATESTDIR" ]; then
     LINKDEST="--link-dest=$LATESTDIR"
 fi
 
+mkdir -p $TODAYDIR
+if [ $? -ne 0 ]; then
+    warn "cannot mkdir: $TODAYDIR"
+    exit 1
+fi
+
 
 # set lock
 cleanup () {
+    rmdir --ignore-fail-on-non-empty $TODAYDIR
     rmdir $LOCKDIR
     exit
 }
@@ -169,7 +176,9 @@ fi
 
 
 # update latest backup
-if [ -L "$LATEST" ]; then
-    rm $LATEST
-    ln -s $TODAYDIR $LATEST
+# to make symblic link with relative path, change dir to $DSTPATH
+cd $DSTPATH
+if [ -L "latest" ]; then
+    rm "latest"
 fi
+ln -s $TODAY "latest"
