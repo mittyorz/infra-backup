@@ -115,15 +115,17 @@ done
 # generate directory path for 'today' and latest backup directories
 LATEST=$(echo "$DSTPATH/latest" | sed -e 's#//#/#')
 LATESTDIR=""       # absolute path of latest backup
-if [ ! -L "$LATEST" ]; then
-    warn "$LATEST is not symblic link"
-    exit 1
-fi
+if [ -e "$LATEST" ]; then
+    if [ ! -L "$LATEST" ]; then
+        warn "$LATEST is not symblic link"
+        exit 1
+    fi
 
-LATESTDIR=$(readlink -m "$LATEST")
-if [ ! -d "$LATESTDIR" ]; then
-    warn "$LATEST -> $LATESTDIR does not exist or is not directory"
-    exit 1
+    LATESTDIR=$(readlink -e "$LATEST")
+    if [ -z "$LATESTDIR" ]; then
+        warn "$LATEST -> $LATESTDIR does not exist"
+        exit 1
+    fi
 fi
 
 TODAY=$(date +'%Y/%m/%d')
