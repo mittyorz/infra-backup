@@ -1,0 +1,184 @@
+#!/bin/sh
+
+set -u
+
+usage () {
+    cat <<'EOF'
+usage: $0 [-c config file] [-l logfile] [-L lockdir] [-s backup source] [-d backup source]
+
+ -c: specify configuration file path
+
+ -o: specify rsync option
+     default is "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+
+ -l: specify log file path
+     default is '/var/log/rsync/rsync-pdumpfs.log'
+
+ -L: specify lock directory path
+     default is '/var/lock/rsync-pdumpfs.lock'
+
+ -s: directory path to be backuped
+     (multiple -d is acceptable)
+
+ -d: root directory path to store backup data
+
+EOF
+}
+
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+warn () {
+    >&2 echo "$0: $@"
+}
+
+isexist () {
+    [ -e "$1" ] && return 0
+    warn "$1 does not exist"
+    exit 1
+}
+
+
+# parse commandline arguments
+__BACKUPLIST=''
+while getopts "c:o:l:L:s:d:" OPT; do
+    case $OPT in
+        c)  CONFFILE="$OPTARG"
+            isexist "$CONFFILE"
+            # load configuration
+            . $CONFFILE
+            ;;
+        o)  RSYNCOPT="$OPTARG"
+            ;;
+        l)  BACKUPLOG="$OPTARG"
+            ;;
+        L)  LOCKDIR="$OPTARG"
+            ;;
+        s)  __BACKUPLIST="$__BACKUPLIST $OPTARG"
+            ;;
+        d)  DSTPATH="$OPTARG"
+            ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
+
+# override with commandline arguments
+if [ -n "$__BACKUPLIST" ]; then
+    BACKUPLIST="$__BACKUPLIST"
+fi
+
+
+# check configuration and set default
+checkvar () {
+    unset _checkvar
+    set +u
+    eval "_checkvar=\$$1"
+    set -u
+    if [ -z "$_checkvar" ]; then
+        if [ $# -eq 2 ]; then
+            eval "$1=\"$2\""
+        else
+            warn "$1 is need to be set"
+            exit 1
+        fi
+    fi
+}
+
+
+# check configrations and set default value if not yet
+checkvar RSYNCOPT "--quiet -a --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+checkvar BACKUPLOG "/var/log/rsync/rsync-pdumpfs.log"
+checkvar LOCKDIR "/var/lock/rsync-pdumpfs.lock"
+checkvar BACKUPLIST
+checkvar DSTPATH
+
+isexist "$DSTPATH"
+
+
+# read directory list and merge them to one line
+# get rid of needless '/' from first and last of line
+DIRLIST=""
+for line in `echo $BACKUPLIST | tr '\n' ' '`
+do
+    if [ ! -e "$line" ]; then
+        warn "$line does not exist, removed from backup list"
+        continue
+    fi
+    line=`echo $line | sed -e 's#/$##'`
+    line=`echo $line | sed -e 's#^/##'`
+    DIRLIST="$DIRLIST /$line"
+done
+
+
+# generate directory path for 'today' and latest backup directories
+LATEST=$(echo "$DSTPATH/latest" | sed -e 's#//#/#')
+LATESTDIR=""       # absolute path of latest backup
+if [ -e "$LATEST" ]; then
+    if [ ! -L "$LATEST" ]; then
+        warn "$LATEST is not symblic link"
+        exit 1
+    fi
+
+    LATESTDIR=$(readlink -e "$LATEST")
+    if [ ! -d "$LATESTDIR" ]; then
+        warn "$LATEST -> $LATESTDIR is not directory"
+        exit 1
+    fi
+fi
+
+TODAY=$(date +'%Y/%m/%d')
+TODAYDIR=$(readlink -m "$DSTPATH/$TODAY")
+
+
+# check latest and today backup directories and modify rsync option
+if [ "$TODAYDIR" = "$LATESTDIR" ]; then
+    warn "today is $TODAY and latest directory is $LATESTDIR, cannot make a new backup twice"
+    exit 1
+fi
+if [ -e "$TODAYDIR" ]; then
+    warn "$TODAYDIR is already existed"
+    exit 1
+fi
+LINKDEST=""
+if [ -n "$LATESTDIR" ]; then
+    LINKDEST="--link-dest=$LATESTDIR"
+fi
+
+mkdir -p $TODAYDIR
+if [ $? -ne 0 ]; then
+    warn "cannot mkdir: $TODAYDIR"
+    exit 1
+fi
+
+
+# set lock
+cleanup () {
+    rmdir --ignore-fail-on-non-empty $TODAYDIR
+    rmdir $LOCKDIR
+    exit
+}
+
+mkdir $LOCKDIR || exit 1
+trap exit HUP INT QUIT PIPE TERM
+trap cleanup EXIT
+
+
+# ready to rsync
+rsync --log-file=$BACKUPLOG $RSYNCOPT \
+    $LINKDEST $DIRLIST $TODAYDIR
+
+if [ $? -ne 0 ]; then
+    warn "something wrong on rsync"
+    exit 1
+fi
+
+
+# update latest backup
+# to make symblic link with relative path, change dir to $DSTPATH
+cd $DSTPATH
+if [ -L "latest" ]; then
+    rm "latest"
+fi
+ln -s $TODAY "latest"
