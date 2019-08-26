@@ -122,8 +122,8 @@ if [ -e "$LATEST" ]; then
     fi
 
     LATESTDIR=$(readlink -e "$LATEST")
-    if [ -z "$LATESTDIR" ]; then
-        warn "$LATEST -> $LATESTDIR does not exist"
+    if [ ! -d "$LATESTDIR" ]; then
+        warn "$LATEST -> $LATESTDIR is not directory"
         exit 1
     fi
 fi
