@@ -22,6 +22,8 @@ usage: $0 [-c config file] [-l logfile] [-L lockdir] [-s backup source] [-d back
 
  -d: root directory path to store backup data
 
+ -a: make backup anytime, not once a day
+
 EOF
 }
 
@@ -43,7 +45,7 @@ isexist () {
 
 # parse commandline arguments
 __BACKUPLIST=''
-while getopts "c:o:l:L:s:d:" OPT; do
+while getopts "c:o:l:L:s:d:a" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
             isexist "$CONFFILE"
@@ -60,6 +62,7 @@ while getopts "c:o:l:L:s:d:" OPT; do
             ;;
         d)  DSTPATH="$OPTARG"
             ;;
+        a)  ANYTIME="true"
     esac
 done
 shift $(( $OPTIND - 1 ))
@@ -93,6 +96,7 @@ checkvar BACKUPLOG "/var/log/rsync/rsync-pdumpfs.log"
 checkvar LOCKDIR "/var/lock/rsync-pdumpfs.lock"
 checkvar BACKUPLIST
 checkvar DSTPATH
+checkvar ANYTIME "false"
 
 isexist "$DSTPATH"
 
@@ -128,7 +132,11 @@ if [ -e "$LATEST" ]; then
     fi
 fi
 
-TODAY=$(date +'%Y/%m/%d')
+if [ "$ANYTIME" = "true" ]; then
+    TODAY=$(date +'%Y/%m/%d-%H%M%S')
+else
+    TODAY=$(date +'%Y/%m/%d')
+fi
 TODAYDIR=$(readlink -m "$DSTPATH/$TODAY")
 
 
