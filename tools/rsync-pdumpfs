@@ -177,9 +177,16 @@ trap cleanup EXIT
 rsync --log-file=$BACKUPLOG $RSYNCOPT \
     $LINKDEST $DIRLIST $TODAYDIR
 
-if [ $? -ne 0 ]; then
+ret=$?
+if [ $ret -eq 24 ]; then
+    # Partial transfer due to vanished source files
+    # ignore this warning
+    ret=0
+fi
+
+if [ $ret -ne 0 ]; then
     warn "something wrong on rsync"
-    exit 1
+    exit $ret
 fi
 
 

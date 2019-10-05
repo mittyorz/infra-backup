@@ -179,7 +179,14 @@ rsync --log-file=$BACKUPLOG $RSYNCOPT \
     -e "ssh -l $SSHUSER -i $SSHKEY -p $BACKUPPORT" \
     $DIRLIST $BACKUPHOST::$RSYNCMODULE
 
-if [ $? -ne 0 ]; then
+ret=$?
+if [ $ret -eq 24 ]; then
+    # Partial transfer due to vanished source files
+    # ignore this warning
+    ret=0
+fi
+
+if [ $ret -ne 0 ]; then
     warn "something wrong on rsync"
-    exit 1
+    exit $ret
 fi
