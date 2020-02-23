@@ -23,7 +23,7 @@ usage: $0 [-c config file] [-h hostname] [-p sshd port] [-k ssh private key]
  -m: specify module name for rsyncd
 
  -o: specify rsync option
-     default is "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+     default is "--quiet -a --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 
  -l: specify log file path
      default is '/var/log/backup/`backup-hostname`.log'
@@ -113,7 +113,7 @@ checkvar BACKUPPORT "22"
 checkvar SSHKEY
 checkvar SSHUSER
 checkvar RSYNCMODULE
-checkvar RSYNCOPT "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+checkvar RSYNCOPT "--quiet -a --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 checkvar BACKUPLOG "/var/log/rsync/backup.${BACKUPHOST}_${RSYNCMODULE}.log"
 checkvar BACKUPLIST
 checkvar LOCKDIR "/var/lock/backup.${BACKUPHOST}_${BACKUPPORT}_${RSYNCMODULE}.lock"
