@@ -9,7 +9,7 @@ usage: $0 [-c config file] [-l logfile] [-L lockdir] [-s backup source] [-d back
  -c: specify configuration file path
 
  -o: specify rsync option
-     default is "--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+     default is "--quiet -a --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
 
  -l: specify log file path
      default is '/var/log/rsync/rsync-pdumpfs.log'

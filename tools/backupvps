@@ -50,7 +50,7 @@ checkvar MOUNTDIR
 checkvar BACKUPLIST
 
 [ -z "$RSYNCOPT" ] && {
-    RSYNCOPT="--quiet -a --compress --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
+    RSYNCOPT="--quiet -a --hard-links --xattrs --delete --force --super --numeric-ids --relative --timeout 600"
     # use md5 checksum for file modification check on every Monday
     if [ `date +%u` -eq 1 ]; then
         RSYNCOPT="$RSYNCOPT --checksum"
