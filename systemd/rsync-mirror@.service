@@ -1,0 +1,14 @@
+[Unit]
+Description=sync the remote file repository to the local mirror using rsync (%i)
+After=network.target
+
+[Service]
+User=mirror
+Group=mirror
+ExecStart=/opt/backup/tools/rsync-mirror -c /etc/mirror/%i.conf
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=read-only
+ProtectControlGroups=yes

@@ -1,0 +1,8 @@
+[Unit]
+Description=sync the remote file repository to the local mirror every hours (%i)
+
+[Timer]
+OnCalendar=*-*-* *:02:00
+
+[Install]
+WantedBy=timers.target
