@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup files to the remote host using rsync+ssh (%i)
+After=network.target
+
+[Service]
+ExecStart=/opt/backup/tools/rsync-backup -c /etc/backup/%i.conf
+NoNewPrivileges=on
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=on
+ProtectKernelModules=yes
+ProtectControlGroups=yes

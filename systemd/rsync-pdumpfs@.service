@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup files like pdumpfs tree using rsync - pdumpfs (%i)
+After=local-fs.target
+
+[Service]
+ExecStart=/opt/backup/tools/rsync-pdumpfs -c /etc/pdumpfs/%i.conf
+NoNewPrivileges=on
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=on
+ProtectKernelModules=yes
+ProtectControlGroups=yes

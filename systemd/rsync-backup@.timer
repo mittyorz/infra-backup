@@ -1,0 +1,8 @@
+[Unit]
+Description=Backup files to the remote host using rsync+ssh for every day (%i)
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+
+[Install]
+WantedBy=timers.target
