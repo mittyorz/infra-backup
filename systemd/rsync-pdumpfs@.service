@@ -3,7 +3,7 @@ Description=Backup files like pdumpfs tree using rsync - pdumpfs (%i)
 After=local-fs.target
 
 [Service]
-ExecStart=/opt/backup/tools/rsync-pdumpfs -c /etc/pdumpfs/%i.conf
+ExecStart=/opt/backup/tools/rsync-pdumpfs -c /etc/pdumpfs/%i.conf -l /var/log/rsync/pdumpfs.%i.log
 NoNewPrivileges=on
 Nice=19
 CPUSchedulingPolicy=idle
