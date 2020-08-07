@@ -29,6 +29,10 @@ usage: $0 [-c config file] [-h source host] [-p source path] [-u url to last upd
  -L: specify lock directory path
      default is '/var/lock/mirror.`hostname`_`path`.lock'
 
+ -P: specify hostname to check connectivity with `ping`
+     if nothing is set, use -h argument as default
+     set 'no' to skip the check
+
 EOF
 }
 
@@ -107,23 +111,29 @@ __SRCPATH=$(echo $SRCPATH | tr '/' '_')
 checkvar RSYNCLOG "/var/log/rsync/mirror.${SRCHOST}_${__SRCPATH}.log"
 checkvar LOCKDIR "/var/lock/mirror.${SRCHOST}_${__SRCPATH}.lock"
 
+checkvar PINGHOST $SRCHOST
+
 isexist "$DSTPATH"
 
 
 # check connectivity of host
-for retry in 1 2 3; do
-    ping -W 1 -c 1 $SRCHOST > /dev/null 2>&1
-    ret=$?
-    if [ $ret -eq 0 ]; then
-        break
-    else
-        sleep 10s
-        continue
+if [ "$PINGHOST" = "no" ]; then
+    warn "skip connectivity check (ping)"
+else
+    for retry in 1 2 3; do
+        ping -W 1 -c 1 $PINGHOST > /dev/null 2>&1
+        ret=$?
+        if [ $ret -eq 0 ]; then
+            break
+        else
+            sleep 10s
+            continue
+        fi
+    done
+    if [ $ret -ne 0 ]; then
+        warn "$PINGHOST seems to be down (ping)"
+        exit 1
     fi
-done
-if [ $ret -ne 0 ]; then
-    warn "$SRCHOST seems to be down (ping)"
-    exit 1
 fi
 
 
