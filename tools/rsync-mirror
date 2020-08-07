@@ -76,6 +76,8 @@ while getopts "c:h:p:u:U:d:o:l:L:" OPT; do
             ;;
         L)  LOCKDIR="$OPTARG"
             ;;
+        P)  PINGHOST="$OPTARG"
+            ;;
     esac
 done
 shift $(( $OPTIND - 1 ))
