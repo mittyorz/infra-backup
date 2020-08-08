@@ -120,7 +120,7 @@ checkvar LOCKDIR "/var/lock/mirror.${SRCHOST}_${__SRCPATH}.lock"
 
 checkvar PINGHOST $SRCHOST
 
-checkvar EXCLUDEFROM ""
+checkvar USEEXCLUDEFROM ""
 
 isexist "$DSTPATH"
 
