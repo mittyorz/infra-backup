@@ -33,6 +33,9 @@ usage: $0 [-c config file] [-h source host] [-p source path] [-u url to last upd
      if nothing is set, use -h argument as default
      set 'no' to skip the check
 
+ -E: set 'yes' to use --exclude-from file
+     use "${configuration file path}.exclude" as pattern file path
+
 EOF
 }
 
@@ -78,6 +81,8 @@ while getopts "c:h:p:u:U:d:o:l:L:" OPT; do
             ;;
         P)  PINGHOST="$OPTARG"
             ;;
+        E)  USEEXCLUDEFROM="$OPTARG"
+            ;;
     esac
 done
 shift $(( $OPTIND - 1 ))
@@ -115,7 +120,16 @@ checkvar LOCKDIR "/var/lock/mirror.${SRCHOST}_${__SRCPATH}.lock"
 
 checkvar PINGHOST $SRCHOST
 
+checkvar EXCLUDEFROM ""
+
 isexist "$DSTPATH"
+
+
+# exclude-from file path is regular file?
+if [ "$USEEXCLUDEFROM" = "yes" ]; then
+    isexist "${CONFFILE}.exclude"
+    RSYNCOPT="${RSYNCOPT} --exclude-from=${CONFFILE}.exclude"
+fi
 
 
 # check connectivity of host
