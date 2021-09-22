@@ -4,7 +4,7 @@ set -u
 
 usage () {
     cat <<'EOF'
-usage: $0 [-c config file] [-l logfile] [-L lockdir] [-s backup source] [-d backup source]
+usage: $0 [-c config file] [-l logfile] [-L lockdir] [-s backup source] [-d backup dest dir]
 
  -c: specify configuration file path
 
