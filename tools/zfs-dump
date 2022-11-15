@@ -111,7 +111,7 @@ fi
 
 # check snapshot existence
 if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | wc -l` -lt $SNAPNUM ]; then
-    warn "snapshot cannot be found on '$TARGETNAME'"
+    warn "no enough snapshot ($SNAPNUM) on '$TARGETNAME'"
     exit 1
 fi
 
