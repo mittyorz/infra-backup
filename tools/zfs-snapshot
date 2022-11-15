@@ -1,0 +1,102 @@
+#!/bin/sh
+
+set -u
+
+usage () {
+    cat <<'EOF'
+usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-n snapshot name]
+
+ -c: specify configuration file path
+
+ -L: specify lock directory path
+     default is '/var/lock/zfs.snapshot.lock'
+
+ -s: target ZFS pool/dataset name
+
+ -n: ZFS snapshot name
+     default is `date +%Y%m%dT%H%M%S`
+
+EOF
+}
+
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+warn () {
+    >&2 echo "$0: $@"
+}
+
+isexist () {
+    [ -e "$1" ] && return 0
+    warn "$1 does not exist"
+    exit 1
+}
+
+
+# parse commandline arguments
+while getopts "c:L:s:n:" OPT; do
+    case $OPT in
+        c)  CONFFILE="$OPTARG"
+            isexist "$CONFFILE"
+            # load configuration
+            . $CONFFILE
+            ;;
+        L)  LOCKDIR="$OPTARG"
+            ;;
+        s)  TARGETNAME="$OPTARG"
+            ;;
+        n)  SNAPNAME="$OPTARG"
+            ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
+
+
+# check configuration and set default
+checkvar () {
+    unset _checkvar
+    set +u
+    eval "_checkvar=\$$1"
+    set -u
+    if [ -z "$_checkvar" ]; then
+        if [ $# -eq 2 ]; then
+            eval "$1=\"$2\""
+        else
+            warn "$1 is need to be set"
+            exit 1
+        fi
+    fi
+}
+
+
+YYYYMMDDThhmmss=$(date +%Y%m%dT%H%M%S)
+
+# check configrations and set default value if not yet
+checkvar LOCKDIR "/var/lock/zfs.snapshot.lock"
+checkvar TARGETNAME
+checkvar SNAPNAME $YYYYMMDDThhmmss
+
+
+# check snapshot existence
+zfs list $TARGETNAME@$SNAPNAME > /dev/null 2> /dev/null
+if [ $? -eq 0 ]; then
+    warn "snapshot already exists: '$TARGETNAME@$SNAPNAME'"
+    exit 1
+fi
+
+
+# set lock
+cleanup () {
+    rmdir $LOCKDIR
+    exit
+}
+
+mkdir $LOCKDIR || exit 1
+trap exit HUP INT QUIT PIPE TERM
+trap cleanup EXIT
+
+
+# create zfs snapshot
+zfs snapshot $TARGETNAME@$SNAPNAME

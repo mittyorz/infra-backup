@@ -1,0 +1,148 @@
+#!/bin/sh
+
+set -u
+
+usage () {
+    cat <<'EOF'
+usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump dest dir] [-i full dump interval]
+
+ -c: specify configuration file path
+
+ -L: specify lock directory path
+     default is '/var/lock/zfs.dump.lock'
+
+ -s: target ZFS pool/dataset name
+
+ -d: directory path to store dump data
+
+ -n: full dump interval: 'monthly' 'weekly' 'daily'
+     default is 'monthly'
+
+EOF
+}
+
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+warn () {
+    >&2 echo "$0: $@"
+}
+
+isexist () {
+    [ -e "$1" ] && return 0
+    warn "$1 does not exist"
+    exit 1
+}
+
+
+# parse commandline arguments
+while getopts "c:L:s:d:i:" OPT; do
+    case $OPT in
+        c)  CONFFILE="$OPTARG"
+            isexist "$CONFFILE"
+            # load configuration
+            . $CONFFILE
+            ;;
+        L)  LOCKDIR="$OPTARG"
+            ;;
+        s)  TARGETNAME="$OPTARG"
+            ;;
+        d)  DSTPATH="$OPTARG"
+            ;;
+        i)  INTERVAL="$OPTARG"
+            ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
+
+
+# check configuration and set default
+checkvar () {
+    unset _checkvar
+    set +u
+    eval "_checkvar=\$$1"
+    set -u
+    if [ -z "$_checkvar" ]; then
+        if [ $# -eq 2 ]; then
+            eval "$1=\"$2\""
+        else
+            warn "$1 is need to be set"
+            exit 1
+        fi
+    fi
+}
+
+
+# check configrations and set default value if not yet
+checkvar LOCKDIR "/var/lock/zfs.dump.lock"
+checkvar TARGETNAME
+checkvar DSTPATH
+checkvar INTERVAL "monthly"
+
+isexist "$DSTPATH"
+
+
+# incremental or full backup
+FULLBACKUP="false"
+if [ $INTERVAL = "daily" ]; then
+    FULLBACKUP="true"
+    SNAPNUM=1
+elif [ $INTERVAL = "weekly" ]; then
+    SNAPNUM=2
+    if [ `date +%u` = "1" ]; then
+        # full backup on Monday
+        FULLBACKUP="true"
+        SNAPNUM=1
+    fi
+elif [ $INTERVAL = "monthly" ]; then
+    SNAPNUM=2
+    if [ `date +%d` = "1" ]; then
+        # full backup on 1st day of month
+        FULLBACKUP="true"
+        SNAPNUM=1
+    fi
+else
+    warn "full dump interval must be 'monthly', 'weekly' or 'daily': '$INTERVAL'"
+    exit 1
+fi
+
+
+# check snapshot existence
+if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | wc -l` -lt $SNAPNUM ]; then
+    warn "snapshot cannot be found on '$TARGETNAME'"
+    exit 1
+fi
+
+
+# set lock
+cleanup () {
+    rmdir $LOCKDIR
+    exit
+}
+
+mkdir $LOCKDIR || exit 1
+trap exit HUP INT QUIT PIPE TERM
+trap cleanup EXIT
+
+
+# make zfs stream file
+if [ "$FULLBACKUP" = "true" ]; then
+    SNAPNAME=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
+    FILENAME=$(echo "${SNAPNAME}.full.zfs" | sed -e 's#/#_#g')
+    if [ -e "$DSTPATH/$FILENAME" ]; then
+        warn "$DSTPATH/$FILENAME already exists"
+        exit 1
+    fi
+    zfs send $SNAPNAME > $DSTPATH/$FILENAME
+else
+    SECONDLATESTSNAP=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -2 | head -1)
+    LATESTSNAP=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
+    FILENAME=$(echo "${SECONDLATESTSNAP}-${LATESTSNAP}.incremental.zfs" | sed -e 's#/#_#g')
+    if [ -e "$DSTPATH/$FILENAME" ]; then
+        warn "$DSTPATH/$FILENAME already exists"
+        exit 1
+    fi
+    zfs send -i $SECONDLATESTSNAP $LATESTSNAP > $DSTPATH/$FILENAME
+fi
