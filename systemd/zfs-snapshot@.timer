@@ -1,0 +1,8 @@
+[Unit]
+Description=Make zfs snapshot - zfs-snapshot for every day (%i)
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+
+[Install]
+WantedBy=timers.target
