@@ -1,0 +1,15 @@
+[Unit]
+Description=Dump zfs snapshot (%i)
+After=local-fs.target
+
+[Service]
+ExecStart=/opt/backup/tools/zfs-dump -c /etc/zfs/dump/%i.conf
+NoNewPrivileges=on
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=on
+ProtectKernelModules=yes
+ProtectControlGroups=yes
