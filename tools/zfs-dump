@@ -97,23 +97,23 @@ checkvar UMASK "0077"
 isexist "$DSTPATH"
 
 
-# incremental or full backup
-FULLBACKUP="false"
+# incremental or full dump
+FULLDUMP="false"
 if [ $INTERVAL = "daily" ]; then
-    FULLBACKUP="true"
+    FULLDUMP="true"
     SNAPNUM=1
 elif [ $INTERVAL = "weekly" ]; then
     SNAPNUM=2
     if [ `date +%u` = "1" ]; then
-        # full backup on Monday
-        FULLBACKUP="true"
+        # full dump on Monday
+        FULLDUMP="true"
         SNAPNUM=1
     fi
 elif [ $INTERVAL = "monthly" ]; then
     SNAPNUM=2
     if [ `date +%d` = "1" ]; then
-        # full backup on 1st day of month
-        FULLBACKUP="true"
+        # full dump on 1st day of month
+        FULLDUMP="true"
         SNAPNUM=1
     fi
 else
@@ -141,7 +141,7 @@ trap cleanup EXIT
 
 
 # set zfs stream file name and zfs exec arguments
-if [ "$FULLBACKUP" = "true" ]; then
+if [ "$FULLDUMP" = "true" ]; then
     SNAPNAME=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
     FILENAME=$(echo "${SNAPNAME}.full.zfs" | sed -e 's#/#_#g')
     ZFS_CMD="zfs send $SNAPNAME"
