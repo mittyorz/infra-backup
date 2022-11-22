@@ -177,7 +177,7 @@ if [ "$FULLDUMP" = "true" ]; then
     FILENAME=$(echo "${SNAPNAME}.full.zfs" | sed -e 's#/#_#g')
     ZFS_CMD="zfs send $SNAPNAME"
 else
-    FILENAME=$(echo "${LATESTSNAP}-${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
+    FILENAME=$(echo "${LATESTSNAP}~${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
     ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
 fi
 
