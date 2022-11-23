@@ -131,6 +131,6 @@ if [ $ret -eq 24 ]; then
 fi
 
 if [ $ret -ne 0 ]; then
-    warn "something wrong on rsync"
+    warn "something wrong on rclone"
     exit $ret
 fi
