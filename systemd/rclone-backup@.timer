@@ -1,0 +1,8 @@
+[Unit]
+Description=Backup files to the remote storage using rclone for every day (%i)
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+
+[Install]
+WantedBy=timers.target

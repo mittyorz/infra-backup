@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup files to the remote storage using rclone (%i)
+After=network.target
+
+[Service]
+ExecStart=/opt/backup/tools/rclone-backup -c /etc/rclone/%i.conf
+NoNewPrivileges=on
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=on
+ProtectKernelModules=yes
+ProtectControlGroups=yes

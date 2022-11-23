@@ -1,0 +1,136 @@
+#!/bin/sh
+
+set -u
+
+usage () {
+    cat <<'EOF'
+usage: $0 [-c config file] [-r rclone config file] [-m remote name] [-p remote path]
+          [-d local path] [-l rclone logfile] [-L lock dir] [-A min-age option for rclone]
+          [-b bandwidth for rclone]
+
+ -c: specify configuration file path
+
+ -r: specify configuration file path of rclone
+
+ -m: remote name of rclone config
+
+ -p: path name of remote
+
+ -d: local directory path to be backuped
+
+ -l: specify log file path of rclone
+     default is '/var/log/rclone/rclone-backup.log'
+
+ -L: specify lock directory path
+     default is '/var/lock/rclone-backup.lock'
+
+ -A: --min-age option for rclone
+
+ -b: --bwlimit option for rclone
+
+EOF
+}
+
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+warn () {
+    >&2 echo "$0: $@"
+}
+
+isexist () {
+    [ -e "$1" ] && return 0
+    warn "$1 does not exist"
+    exit 1
+}
+
+
+# parse commandline arguments
+while getopts "c:r:m:p:d:l:L:A:" OPT; do
+    case $OPT in
+        c)  CONFFILE="$OPTARG"
+            isexist "$CONFFILE"
+            # load configuration
+            . $CONFFILE
+            ;;
+        r)  RCLONECONF="$OPTARG"
+            ;;
+        m)  REMOTENAME="$OPTARG"
+            ;;
+        p)  REMOTEPATH="$OPTARG"
+            ;;
+        d)  LOCALPATH="$OPTARG"
+            ;;
+        l)  RCLONELOG="$OPTARG"
+            ;;
+        L)  LOCKDIR="$OPTARG"
+            ;;
+        A)  MIN_AGE="$OPTARG"
+            ;;
+        b)  BANDWIDTH="$OPTARG"
+            ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
+
+
+# check configuration and set default
+checkvar () {
+    unset _checkvar
+    set +u
+    eval "_checkvar=\$$1"
+    set -u
+    if [ -z "$_checkvar" ]; then
+        if [ $# -eq 2 ]; then
+            eval "$1=\"$2\""
+        else
+            warn "$1 is need to be set"
+            exit 1
+        fi
+    fi
+}
+
+
+# check configrations and set default value if not yet
+checkvar RCLONECONF
+checkvar REMOTENAME
+checkvar REMOTEPATH
+checkvar LOCALPATH
+checkvar RCLONELOG "/var/log/rclone/rclone-backup.log"
+checkvar LOCKDIR "/var/lock/rclone-backup.lock"
+checkvar MIN_AGE
+checkvar BANDWIDTH
+
+isexist "$RCLONECONF"
+isexist "$LOCALPATH"
+
+
+# set lock
+cleanup () {
+    rmdir $LOCKDIR
+    exit
+}
+
+mkdir $LOCKDIR || exit 1
+trap exit HUP INT QUIT PIPE TERM
+trap cleanup EXIT
+
+
+# ready to rclone
+rclone --config="$RCLONECONF" --log-level=INFO --log-file=$RCLONELOG --stats=1m \
+    --stats-one-line-date --min-age $MIN_AGE --bwlimit $BANDWIDTH \
+    copy $LOCALPATH $REMOTENAME:$REMOTEPATH
+
+ret=$?
+if [ $ret -eq 24 ]; then
+    # Partial transfer due to vanished source files
+    # ignore this warning
+    ret=0
+fi
+
+if [ $ret -ne 0 ]; then
+    warn "something wrong on rsync"
+    exit $ret
+fi
