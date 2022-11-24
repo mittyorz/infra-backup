@@ -119,7 +119,7 @@ trap cleanup EXIT
 
 
 # ready to rclone
-rclone --config="$RCLONECONF" --log-level=INFO --log-file=$RCLONELOG --stats=1m \
+rclone --config="$RCLONECONF" --log-level=INFO --log-file=$RCLONELOG --stats=0 \
     --stats-one-line-date --min-age $MIN_AGE --bwlimit $BANDWIDTH \
     copy $LOCALPATH $REMOTENAME:$REMOTEPATH
 
