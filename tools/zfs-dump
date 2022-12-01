@@ -114,7 +114,7 @@ elif [ $INTERVAL = "weekly" ]; then
         FULLDUMP="true"
     fi
 elif [ $INTERVAL = "monthly" ]; then
-    if [ `date +%d` = "1" ]; then
+    if [ `date +%d` = "01" ]; then
         # full dump on 1st day of month
         FULLDUMP="true"
     fi
