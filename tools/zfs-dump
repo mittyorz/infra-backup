@@ -104,79 +104,6 @@ isexist "$DSTPATH"
 isexist "$STATEDIR"
 
 
-# incremental or full dump
-FULLDUMP="false"
-if [ $INTERVAL = "none" ]; then
-    :   # do nothing on FULLDUMP
-elif [ $INTERVAL = "daily" ]; then
-    FULLDUMP="true"
-elif [ $INTERVAL = "weekly" ]; then
-    if [ `date +%u` = "1" ]; then
-        # full dump on Monday
-        FULLDUMP="true"
-    fi
-elif [ $INTERVAL = "monthly" ]; then
-    if [ `date +%d` = "01" ]; then
-        # full dump on 1st day of month
-        FULLDUMP="true"
-    fi
-else
-    warn "full dump interval must be 'monthly', 'weekly', 'daily' or 'none': '$INTERVAL'"
-    exit 1
-fi
-
-
-# check snapshot existence
-if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | wc -l` -lt 1 ]; then
-    warn "no enough snapshot on '$TARGETNAME'"
-    exit 1
-fi
-if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | wc -l` -eq 1 ]; then
-    warn "only one snapshot exists on '$TARGETNAME', make full dump"
-    FULLDUMP="true"
-fi
-
-
-# read state file and check latest snapshot
-STATEFILE=$(echo $TARGETNAME | sed -e 's#/#_#g')
-LATESTSNAP=""
-if [ ! -e "$STATEDIR/$STATEFILE" ]; then
-    # this may be the first time of making dump file of snapshot
-    warn "state file does not exist: $STATEDIR/$STATEFILE"
-    FULLDUMP="true"
-else
-    LATESTSNAP=$(cat $STATEDIR/$STATEFILE)
-    if [ -z "$LATESTSNAP" ]; then
-        warn "state file is empty: $STATEDIR/$STATEFILE"
-        LATESTSNAP=""
-    else
-        if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | grep -c "^${LATESTSNAP}$"` -ne 1 ]; then
-            warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
-            LATESTSNAP=""
-        fi
-        if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1` = "$LATESTSNAP" ]; then
-            warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
-            LATESTSNAP=""
-        fi
-    fi
-fi
-if [ -z "$LATESTSNAP" -a "$FULLDUMP" = "false" ]; then
-    warn "full dump is off, no output and exit"
-    exit 1
-fi
-
-
-# set lock
-cleanup () {
-    rmdir $LOCKDIR
-    exit
-}
-
-mkdir $LOCKDIR || exit 1
-trap exit HUP INT QUIT PIPE TERM
-trap cleanup EXIT
-
-
 # exec zfs send command and save state file
 zfs_dump () {
     COMMAND="$1"
@@ -200,8 +127,82 @@ zfs_dump () {
 }
 
 
+# incremental or full dump
+FULLDUMP="false"
+if [ $INTERVAL = "none" ]; then
+    :   # do nothing on FULLDUMP
+elif [ $INTERVAL = "daily" ]; then
+    FULLDUMP="true"
+elif [ $INTERVAL = "weekly" ]; then
+    if [ `date +%u` = "1" ]; then
+        # full dump on Monday
+        FULLDUMP="true"
+    fi
+elif [ $INTERVAL = "monthly" ]; then
+    if [ `date +%d` = "01" ]; then
+        # full dump on 1st day of month
+        FULLDUMP="true"
+    fi
+else
+    warn "full dump interval must be 'monthly', 'weekly', 'daily' or 'none': '$INTERVAL'"
+    exit 1
+fi
+
+
+# check snapshot existence
+SNAPSHOTS=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME)
+SNAPNAME=$(echo "$SNAPSHOTS" | tail -1)
+if [ `echo "$SNAPSHOTS" | wc -l` -lt 1 ]; then
+    warn "no enough snapshot on '$TARGETNAME'"
+    exit 1
+fi
+if [ `echo "$SNAPSHOTS" | wc -l` -eq 1 ]; then
+    warn "only one snapshot exists on '$TARGETNAME', make full dump"
+    FULLDUMP="true"
+fi
+
+
+# read state file and check latest snapshot
+STATEFILE=$(echo $TARGETNAME | sed -e 's#/#_#g')
+LATESTSNAP=""
+if [ ! -e "$STATEDIR/$STATEFILE" ]; then
+    # this may be the first time of making dump file of snapshot
+    warn "state file does not exist: $STATEDIR/$STATEFILE"
+    FULLDUMP="true"
+else
+    LATESTSNAP=$(cat $STATEDIR/$STATEFILE)
+    if [ -z "$LATESTSNAP" ]; then
+        warn "state file is empty: $STATEDIR/$STATEFILE"
+        LATESTSNAP=""
+    else
+        if [ `echo "$SNAPSHOTS" | grep -c "^${LATESTSNAP}$"` -ne 1 ]; then
+            warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
+            LATESTSNAP=""
+        fi
+        if [ "$SNAPNAME" = "$LATESTSNAP" ]; then
+            warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
+            LATESTSNAP=""
+        fi
+    fi
+fi
+if [ -z "$LATESTSNAP" -a "$FULLDUMP" = "false" ]; then
+    warn "full dump is off, no output and exit"
+    exit 1
+fi
+
+
+# set lock
+cleanup () {
+    rmdir $LOCKDIR
+    exit
+}
+
+mkdir $LOCKDIR || exit 1
+trap exit HUP INT QUIT PIPE TERM
+trap cleanup EXIT
+
+
 # set zfs stream file name and zfs exec arguments
-SNAPNAME=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
 if [ -n "$LATESTSNAP" ]; then
     FILENAME=$(echo "${LATESTSNAP}~${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
     ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
