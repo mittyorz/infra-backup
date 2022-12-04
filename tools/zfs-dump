@@ -151,7 +151,7 @@ fi
 
 # check snapshot existence
 SNAPSHOTS=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME)
-SNAPNAME=$(echo "$SNAPSHOTS" | tail -1)
+NEWESTSNAP=$(echo "$SNAPSHOTS" | tail -1)
 if [ `echo "$SNAPSHOTS" | wc -l` -lt 1 ]; then
     warn "no enough snapshot on '$TARGETNAME'"
     exit 1
@@ -179,7 +179,7 @@ else
             warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
             LATESTSNAP=""
         fi
-        if [ "$SNAPNAME" = "$LATESTSNAP" ]; then
+        if [ "$NEWESTSNAP" = "$LATESTSNAP" ]; then
             warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
             LATESTSNAP=""
         fi
@@ -204,16 +204,16 @@ trap cleanup EXIT
 
 # set zfs stream file name and zfs exec arguments
 if [ -n "$LATESTSNAP" ]; then
-    FILENAME=$(echo "${LATESTSNAP}~${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
+    FILENAME=$(echo "${LATESTSNAP}~${NEWESTSNAP}.incremental.zfs" | sed -e 's#/#_#g')
+    ZFS_CMD="zfs send -i $LATESTSNAP $NEWESTSNAP"
 
     zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
-    echo "$SNAPNAME" > $STATEDIR/$STATEFILE
+    echo "$NEWESTSNAP" > $STATEDIR/$STATEFILE
 fi
 if [ "$FULLDUMP" = "true" ]; then
-    FILENAME=$(echo "${SNAPNAME}.full.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send $SNAPNAME"
+    FILENAME=$(echo "${NEWESTSNAP}.full.zfs" | sed -e 's#/#_#g')
+    ZFS_CMD="zfs send $NEWESTSNAP"
 
     zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
-    echo "$SNAPNAME" > $STATEDIR/$STATEFILE
+    echo "$NEWESTSNAP" > $STATEDIR/$STATEFILE
 fi
