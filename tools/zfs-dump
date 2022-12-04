@@ -105,8 +105,9 @@ isexist "$STATEDIR"
 
 
 # incremental or full dump
+FULLDUMP="false"
 if [ $INTERVAL = "none" ]; then
-    FULLDUMP="false"
+    :   # do nothing on FULLDUMP
 elif [ $INTERVAL = "daily" ]; then
     FULLDUMP="true"
 elif [ $INTERVAL = "weekly" ]; then
