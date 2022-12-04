@@ -5,7 +5,7 @@ set -u
 usage () {
     cat <<'EOF'
 usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump dest dir] [-b state file dir]
-          [-i full dump interval] [-z] [-u 0077]
+          [-i full dump interval] [-z] [-u 0077] [-k]
 
  -c: specify configuration file path
 
@@ -28,6 +28,9 @@ usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump d
  -u: set umask
      detault is '0077'
 
+ -k: set '-c' option for zfs send
+     default is 'false'
+
 EOF
 }
 
@@ -48,7 +51,7 @@ isexist () {
 
 
 # parse commandline arguments
-while getopts "c:L:s:d:b:i:zu:" OPT; do
+while getopts "c:L:s:d:b:i:zu:k" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
             isexist "$CONFFILE"
@@ -68,6 +71,8 @@ while getopts "c:L:s:d:b:i:zu:" OPT; do
         z)  ZSTD="true"
             ;;
         u)  UMASK="$OPTARG"
+            ;;
+        k)  COMPRESSED="true"
             ;;
     esac
 done
@@ -99,6 +104,7 @@ checkvar STATEDIR "/var/lib/zfs-dump"
 checkvar INTERVAL "monthly"
 checkvar ZSTD "false"
 checkvar UMASK "0077"
+checkvar COMPRESSED "false"
 
 isexist "$DSTPATH"
 isexist "$STATEDIR"
@@ -203,16 +209,21 @@ trap cleanup EXIT
 
 
 # set zfs stream file name and zfs exec arguments
+if [ "$COMPRESSED" = "true" ]; then
+    ZFS_OPT="-c"
+else
+    ZFS_OPT=""
+fi
 if [ -n "$LATESTSNAP" ]; then
     FILENAME=$(echo "${LATESTSNAP}~${NEWESTSNAP}.incremental.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send -i $LATESTSNAP $NEWESTSNAP"
+    ZFS_CMD="zfs send $ZFS_OPT -i $LATESTSNAP $NEWESTSNAP"
 
     zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
     echo "$NEWESTSNAP" > $STATEDIR/$STATEFILE
 fi
 if [ "$FULLDUMP" = "true" ]; then
     FILENAME=$(echo "${NEWESTSNAP}.full.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send $NEWESTSNAP"
+    ZFS_CMD="zfs send $ZFS_OPT $NEWESTSNAP"
 
     zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
     echo "$NEWESTSNAP" > $STATEDIR/$STATEFILE
