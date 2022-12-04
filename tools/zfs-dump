@@ -19,7 +19,7 @@ usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump d
  -b: directory path to store state file
      default is '/var/lib/zfs-dump'
 
- -i: full dump interval: 'monthly' 'weekly' 'daily'
+ -i: full dump interval: 'monthly' 'weekly' 'daily' 'none'
      default is 'monthly'
 
  -z: use pzstd to compress dump data
@@ -105,8 +105,9 @@ isexist "$STATEDIR"
 
 
 # incremental or full dump
-FULLDUMP="false"
-if [ $INTERVAL = "daily" ]; then
+if [ $INTERVAL = "none" ]; then
+    FULLDUMP="false"
+elif [ $INTERVAL = "daily" ]; then
     FULLDUMP="true"
 elif [ $INTERVAL = "weekly" ]; then
     if [ `date +%u` = "1" ]; then
@@ -119,7 +120,7 @@ elif [ $INTERVAL = "monthly" ]; then
         FULLDUMP="true"
     fi
 else
-    warn "full dump interval must be 'monthly', 'weekly' or 'daily': '$INTERVAL'"
+    warn "full dump interval must be 'monthly', 'weekly', 'daily' or 'none': '$INTERVAL'"
     exit 1
 fi
 
