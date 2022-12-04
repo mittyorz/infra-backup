@@ -139,6 +139,7 @@ fi
 
 # read state file and check latest snapshot
 STATEFILE=$(echo $TARGETNAME | sed -e 's#/#_#g')
+LATESTSNAP=""
 if [ "$FULLDUMP" = "false" ]; then
     if [ ! -e "$STATEDIR/$STATEFILE" ]; then
         warn "state file does not exist: $STATEDIR/$STATEFILE, make full dump"
@@ -173,6 +174,23 @@ trap exit HUP INT QUIT PIPE TERM
 trap cleanup EXIT
 
 
+# exec zfs send command and save state file
+zfs_dump () {
+    COMMAND="$1"
+    FILEPATH="$2"
+
+    if [ -e "$FILEPATH" ]; then
+        warn "$FILEPATH already exists"
+        exit 1
+    fi
+
+    UMASK_ORIG=$(umask)
+    umask $UMASK
+    eval "${COMMAND} > $FILEPATH"
+    umask $UMASK_ORIG
+}
+
+
 # set zfs stream file name and zfs exec arguments
 SNAPNAME=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
 if [ "$FULLDUMP" = "true" ]; then
@@ -190,14 +208,6 @@ fi
 
 
 # make zfs stream file
-if [ -e "$DSTPATH/$FILENAME" ]; then
-    warn "$DSTPATH/$FILENAME already exists"
-    exit 1
-fi
+zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME"
 
-UMASK_ORIG=$(umask)
-umask $UMASK
-eval "${ZFS_CMD} > $DSTPATH/$FILENAME"
-
-umask $UMASK_ORIG
 echo "$SNAPNAME" > $STATEDIR/$STATEFILE
