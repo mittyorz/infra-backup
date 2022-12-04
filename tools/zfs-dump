@@ -140,26 +140,29 @@ fi
 # read state file and check latest snapshot
 STATEFILE=$(echo $TARGETNAME | sed -e 's#/#_#g')
 LATESTSNAP=""
-if [ "$FULLDUMP" = "false" ]; then
-    if [ ! -e "$STATEDIR/$STATEFILE" ]; then
-        warn "state file does not exist: $STATEDIR/$STATEFILE, make full dump"
-        FULLDUMP="true"
+if [ ! -e "$STATEDIR/$STATEFILE" ]; then
+    # this may be the first time of making dump file of snapshot
+    warn "state file does not exist: $STATEDIR/$STATEFILE"
+    FULLDUMP="true"
+else
+    LATESTSNAP=$(cat $STATEDIR/$STATEFILE)
+    if [ -z "$LATESTSNAP" ]; then
+        warn "state file is empty: $STATEDIR/$STATEFILE"
+        LATESTSNAP=""
     else
-        LATESTSNAP=$(cat $STATEDIR/$STATEFILE)
-        if [ -z "$LATESTSNAP" ]; then
-            warn "state file is empty: $STATEDIR/$STATEFILE"
-            exit 1
-        else
-            if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | grep -c "^${LATESTSNAP}$"` -ne 1 ]; then
-                warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
-                exit 1
-            fi
-            if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1` = "$LATESTSNAP" ]; then
-                warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
-                exit 1
-            fi
+        if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | grep -c "^${LATESTSNAP}$"` -ne 1 ]; then
+            warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
+            LATESTSNAP=""
+        fi
+        if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1` = "$LATESTSNAP" ]; then
+            warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
+            LATESTSNAP=""
         fi
     fi
+fi
+if [ -z "$LATESTSNAP" -a "$FULLDUMP" = "false" ]; then
+    warn "full dump is off, no output and exit"
+    exit 1
 fi
 
 
@@ -199,16 +202,17 @@ zfs_dump () {
 
 # set zfs stream file name and zfs exec arguments
 SNAPNAME=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
+if [ -n "$LATESTSNAP" ]; then
+    FILENAME=$(echo "${LATESTSNAP}~${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
+    ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
+
+    zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
+    echo "$SNAPNAME" > $STATEDIR/$STATEFILE
+fi
 if [ "$FULLDUMP" = "true" ]; then
     FILENAME=$(echo "${SNAPNAME}.full.zfs" | sed -e 's#/#_#g')
     ZFS_CMD="zfs send $SNAPNAME"
-else
-    FILENAME=$(echo "${LATESTSNAP}~${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
+
+    zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
+    echo "$SNAPNAME" > $STATEDIR/$STATEFILE
 fi
-
-
-# make zfs stream file
-zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
-
-echo "$SNAPNAME" > $STATEDIR/$STATEFILE
