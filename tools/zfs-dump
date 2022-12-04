@@ -178,6 +178,12 @@ trap cleanup EXIT
 zfs_dump () {
     COMMAND="$1"
     FILEPATH="$2"
+    ZSTD="$3"
+
+    if [ "$ZSTD" = "true" ]; then
+        COMMAND="${COMMAND} | pzstd"
+        FILEPATH="${FILEPATH}.zst"
+    fi
 
     if [ -e "$FILEPATH" ]; then
         warn "$FILEPATH already exists"
@@ -201,13 +207,8 @@ else
     ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
 fi
 
-if [ "$ZSTD" = "true" ]; then
-    FILENAME="${FILENAME}.zst"
-    ZFS_CMD="${ZFS_CMD} | pzstd"
-fi
-
 
 # make zfs stream file
-zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME"
+zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
 
 echo "$SNAPNAME" > $STATEDIR/$STATEFILE
