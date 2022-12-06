@@ -5,7 +5,7 @@ set -u
 usage () {
     cat <<'EOF'
 usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump dest dir] [-b state file dir]
-          [-i full dump interval] [-z] [-u 0077]
+          [-i full dump interval] [-z] [-u 0077] [-k]
 
  -c: specify configuration file path
 
@@ -19,7 +19,7 @@ usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump d
  -b: directory path to store state file
      default is '/var/lib/zfs-dump'
 
- -i: full dump interval: 'monthly' 'weekly' 'daily'
+ -i: full dump interval: 'monthly' 'weekly' 'daily' 'none'
      default is 'monthly'
 
  -z: use pzstd to compress dump data
@@ -27,6 +27,9 @@ usage: $0 [-c config file] [-L lockdir] [-s target pool/dataset name] [-d dump d
 
  -u: set umask
      detault is '0077'
+
+ -k: set '-c' option for zfs send
+     default is 'false'
 
 EOF
 }
@@ -48,7 +51,7 @@ isexist () {
 
 
 # parse commandline arguments
-while getopts "c:L:s:d:b:i:zu:" OPT; do
+while getopts "c:L:s:d:b:i:zu:k" OPT; do
     case $OPT in
         c)  CONFFILE="$OPTARG"
             isexist "$CONFFILE"
@@ -68,6 +71,8 @@ while getopts "c:L:s:d:b:i:zu:" OPT; do
         z)  ZSTD="true"
             ;;
         u)  UMASK="$OPTARG"
+            ;;
+        k)  COMPRESSED="true"
             ;;
     esac
 done
@@ -99,14 +104,40 @@ checkvar STATEDIR "/var/lib/zfs-dump"
 checkvar INTERVAL "monthly"
 checkvar ZSTD "false"
 checkvar UMASK "0077"
+checkvar COMPRESSED "false"
 
 isexist "$DSTPATH"
 isexist "$STATEDIR"
 
 
+# exec zfs send command and save state file
+zfs_dump () {
+    COMMAND="$1"
+    FILEPATH="$2"
+    ZSTD="$3"
+
+    if [ "$ZSTD" = "true" ]; then
+        COMMAND="${COMMAND} | pzstd"
+        FILEPATH="${FILEPATH}.zst"
+    fi
+
+    if [ -e "$FILEPATH" ]; then
+        warn "$FILEPATH already exists"
+        exit 1
+    fi
+
+    UMASK_ORIG=$(umask)
+    umask $UMASK
+    eval "${COMMAND} > $FILEPATH"
+    umask $UMASK_ORIG
+}
+
+
 # incremental or full dump
 FULLDUMP="false"
-if [ $INTERVAL = "daily" ]; then
+if [ $INTERVAL = "none" ]; then
+    :   # do nothing on FULLDUMP
+elif [ $INTERVAL = "daily" ]; then
     FULLDUMP="true"
 elif [ $INTERVAL = "weekly" ]; then
     if [ `date +%u` = "1" ]; then
@@ -119,17 +150,19 @@ elif [ $INTERVAL = "monthly" ]; then
         FULLDUMP="true"
     fi
 else
-    warn "full dump interval must be 'monthly', 'weekly' or 'daily': '$INTERVAL'"
+    warn "full dump interval must be 'monthly', 'weekly', 'daily' or 'none': '$INTERVAL'"
     exit 1
 fi
 
 
 # check snapshot existence
-if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | wc -l` -lt 1 ]; then
+SNAPSHOTS=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME)
+NEWESTSNAP=$(echo "$SNAPSHOTS" | tail -1)
+if [ `echo "$SNAPSHOTS" | wc -l` -lt 1 ]; then
     warn "no enough snapshot on '$TARGETNAME'"
     exit 1
 fi
-if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | wc -l` -eq 1 ]; then
+if [ `echo "$SNAPSHOTS" | wc -l` -eq 1 ]; then
     warn "only one snapshot exists on '$TARGETNAME', make full dump"
     FULLDUMP="true"
 fi
@@ -137,26 +170,30 @@ fi
 
 # read state file and check latest snapshot
 STATEFILE=$(echo $TARGETNAME | sed -e 's#/#_#g')
-if [ "$FULLDUMP" = "false" ]; then
-    if [ ! -e "$STATEDIR/$STATEFILE" ]; then
-        warn "state file does not exist: $STATEDIR/$STATEFILE, make full dump"
-        FULLDUMP="true"
+LATESTSNAP=""
+if [ ! -e "$STATEDIR/$STATEFILE" ]; then
+    # this may be the first time of making dump file of snapshot
+    warn "state file does not exist: $STATEDIR/$STATEFILE"
+    FULLDUMP="true"
+else
+    LATESTSNAP=$(cat $STATEDIR/$STATEFILE)
+    if [ -z "$LATESTSNAP" ]; then
+        warn "state file is empty: $STATEDIR/$STATEFILE"
+        LATESTSNAP=""
     else
-        LATESTSNAP=$(cat $STATEDIR/$STATEFILE)
-        if [ -z "$LATESTSNAP" ]; then
-            warn "state file is empty: $STATEDIR/$STATEFILE"
-            exit 1
-        else
-            if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | grep -c "^${LATESTSNAP}$"` -ne 1 ]; then
-                warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
-                exit 1
-            fi
-            if [ `zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1` = "$LATESTSNAP" ]; then
-                warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
-                exit 1
-            fi
+        if [ `echo "$SNAPSHOTS" | grep -c "^${LATESTSNAP}$"` -ne 1 ]; then
+            warn "latest snapshot name '$LATESTSNAP' does not exist on '$TARGETNAME'"
+            LATESTSNAP=""
+        fi
+        if [ "$NEWESTSNAP" = "$LATESTSNAP" ]; then
+            warn "no snapshot newer than '$LATESTSNAP' found on '$TARGETNAME'"
+            LATESTSNAP=""
         fi
     fi
+fi
+if [ -z "$LATESTSNAP" -a "$FULLDUMP" = "false" ]; then
+    warn "full dump is off, no output and exit"
+    exit 1
 fi
 
 
@@ -172,30 +209,22 @@ trap cleanup EXIT
 
 
 # set zfs stream file name and zfs exec arguments
-SNAPNAME=$(zfs list -H -t snapshot -o name -s creation $TARGETNAME | tail -1)
-if [ "$FULLDUMP" = "true" ]; then
-    FILENAME=$(echo "${SNAPNAME}.full.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send $SNAPNAME"
+if [ "$COMPRESSED" = "true" ]; then
+    ZFS_OPT="-c"
 else
-    FILENAME=$(echo "${LATESTSNAP}~${SNAPNAME}.incremental.zfs" | sed -e 's#/#_#g')
-    ZFS_CMD="zfs send -i $LATESTSNAP $SNAPNAME"
+    ZFS_OPT=""
 fi
+if [ -n "$LATESTSNAP" ]; then
+    FILENAME=$(echo "${LATESTSNAP}~${NEWESTSNAP}.incremental.zfs" | sed -e 's#/#_#g')
+    ZFS_CMD="zfs send $ZFS_OPT -i $LATESTSNAP $NEWESTSNAP"
 
-if [ "$ZSTD" = "true" ]; then
-    FILENAME="${FILENAME}.zst"
-    ZFS_CMD="${ZFS_CMD} | pzstd"
+    zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
+    echo "$NEWESTSNAP" > $STATEDIR/$STATEFILE
 fi
+if [ "$FULLDUMP" = "true" ]; then
+    FILENAME=$(echo "${NEWESTSNAP}.full.zfs" | sed -e 's#/#_#g')
+    ZFS_CMD="zfs send $ZFS_OPT $NEWESTSNAP"
 
-
-# make zfs stream file
-if [ -e "$DSTPATH/$FILENAME" ]; then
-    warn "$DSTPATH/$FILENAME already exists"
-    exit 1
+    zfs_dump "${ZFS_CMD}" "$DSTPATH/$FILENAME" "$ZSTD"
+    echo "$NEWESTSNAP" > $STATEDIR/$STATEFILE
 fi
-
-UMASK_ORIG=$(umask)
-umask $UMASK
-eval "${ZFS_CMD} > $DSTPATH/$FILENAME"
-
-umask $UMASK_ORIG
-echo "$SNAPNAME" > $STATEDIR/$STATEFILE
